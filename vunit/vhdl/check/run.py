@@ -12,8 +12,8 @@ from vunit.check_preprocessor import CheckPreprocessor
 
 sys.path.append(str(Path(__file__).parent / "tools"))
 
-import generate_check_equal
-import generate_check_match
+from .tools import generate_check_equal
+from .tools import generate_check_match
 
 generate_check_equal.main()
 generate_check_match.main()
