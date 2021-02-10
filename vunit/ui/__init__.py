@@ -113,6 +113,7 @@ class VUnit(  # pylint: disable=too-many-instance-attributes, too-many-public-me
         compile_builtins: Optional[bool] = True,
         vhdl_standard: Optional[str] = None,
     ):
+        self._resources = []
         self._args = args
         self._configure_logging(args.log_level)
         self._output_path = str(Path(args.output_path).resolve())
@@ -741,13 +742,13 @@ avoid location preprocessing of other functions sharing name with a VUnit log or
 
         sys.exit(0)
 
-    def _create_tests(self, simulator_if: Union[None, SimulatorInterface]):
+    def _create_tests(self, simulator_if: Union[None, SimulatorInterface], resources):
         """
         Create the test cases
         """
         self._test_bench_list.warn_when_empty()
         test_list = self._test_bench_list.create_tests(
-            simulator_if, self._args.elaborate
+            simulator_if, self._args.elaborate, resources
         )
         test_list.keep_matches(self._test_filter)
         return test_list
@@ -797,7 +798,7 @@ avoid location preprocessing of other functions sharing name with a VUnit log or
         Main with running tests
         """
         simulator_if = self._create_simulator_if()
-        test_list = self._create_tests(simulator_if)
+        test_list = self._create_tests(simulator_if, self._resources)
         self._compile(simulator_if)
         print()
 
@@ -830,7 +831,7 @@ avoid location preprocessing of other functions sharing name with a VUnit log or
         """
         Main function when only listing test cases
         """
-        test_list = self._create_tests(simulator_if=None)
+        test_list = self._create_tests(simulator_if=None, resources=self._resources)
         for test_name in test_list.test_names:
             print(test_name)
         print("Listed %i tests" % test_list.num_tests)
@@ -854,7 +855,9 @@ avoid location preprocessing of other functions sharing name with a VUnit log or
             )
 
         tests = []
-        for test_suite in self._create_tests(simulator_if=None):
+        for test_suite in self._create_tests(
+            simulator_if=None, resources=self._resources
+        ):
             test_information = test_suite.test_information
             test_configuration = test_suite.test_configuration
             for name in test_suite.test_names:
@@ -955,7 +958,7 @@ avoid location preprocessing of other functions sharing name with a VUnit log or
         """
         Return the list of all test bench files for the currently selected tests to run
         """
-        test_list = self._create_tests(simulator_if)
+        test_list = self._create_tests(simulator_if, resources=self._resources)
         tb_file_names = {test_suite.file_name for test_suite in test_list}
         return [
             self.get_source_file(  # pylint: disable=protected-access
@@ -984,6 +987,7 @@ avoid location preprocessing of other functions sharing name with a VUnit log or
             fail_fast=self._args.fail_fast,
             dont_catch_exceptions=self._args.dont_catch_exceptions,
             no_color=self._args.no_color,
+            resources=self._resources,
         )
         runner.run(test_cases)
 
@@ -1109,3 +1113,9 @@ avoid location preprocessing of other functions sharing name with a VUnit log or
         if self._simulator_class is None:
             return None
         return self._simulator_class.supports_coverage()
+
+    def add_resource(self, source_file):
+        self._resources.append(source_file)
+
+    def get_resources(self):
+        return self._resources

@@ -42,6 +42,7 @@ class TestRunner(object):  # pylint: disable=too-many-instance-attributes
         fail_fast=False,
         dont_catch_exceptions=False,
         no_color=False,
+        resources=[],
     ):
         self._lock = threading.Lock()
         self._fail_fast = fail_fast

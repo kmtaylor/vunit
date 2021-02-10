@@ -8,11 +8,13 @@
 Functions to add builtin VHDL code to a project for compilation
 """
 
+from os.path import join, abspath, dirname, basename
 from pathlib import Path
 from glob import glob
 from warnings import warn
 from vunit.vhdl_standard import VHDL, VHDLStandard
 from vunit.ui.common import get_checked_file_names_from_globs
+from vunit.sim_if.common import simulator_check, simulator_is
 
 VHDL_PATH = (Path(__file__).parent / "vhdl").resolve()
 VERILOG_PATH = (Path(__file__).parent / "verilog").resolve()
@@ -52,8 +54,8 @@ class Builtins(object):
             and self._vhdl_standard.supports_context
         )
 
-        for file_name in get_checked_file_names_from_globs(pattern, allow_empty):
-            base_file_name = Path(file_name).name
+        for file_name in glob(pattern):
+            base_file_name = basename(file_name)
 
             standards = set()
             for standard in VHDL.STANDARDS:
@@ -69,6 +71,11 @@ class Builtins(object):
             if not supports_context and file_name.endswith("_context.vhd"):
                 continue
 
+            if (self._simulator_class.name == "xsim") and file_name.endswith(
+                "_context.vhd"
+            ):
+                continue
+
             self._vunit_lib.add_source_file(file_name)
 
     def _add_data_types(self, external=None):
@@ -81,24 +88,74 @@ class Builtins(object):
                              'integer': ['path/to/custom/file']
                          }.
         """
-        self._add_files(VHDL_PATH / "data_types" / "src" / "*.vhd")
+        if simulator_is("xsim"):
+            self._add_files(join(VHDL_PATH, "xsim", "data_types", "src", "*.vhd"))
 
-        for key in ["string", "integer_vector"]:
-            self._add_files(
-                pattern=str(
-                    VHDL_PATH
-                    / "data_types"
-                    / "src"
-                    / "api"
-                    / ("external_%s_pkg.vhd" % key)
+            use_ext = {"string": False, "integer": False}
+            files = {"string": None, "integer": None}
+
+            if external:
+                for ind, val in external.items():
+                    if isinstance(val, bool):
+                        use_ext[ind] = val
+                    else:
+                        use_ext[ind] = True
+                        files[ind] = val
+
+            for _, val in use_ext.items():
+                if val and simulator_check(
+                    lambda simclass: not simclass.supports_vhpi()
+                ):
+                    raise RuntimeError(
+                        "the selected simulator does not support VHPI; must use non-VHPI packages..."
+                    )
+
+            ext_path = join(VHDL_PATH, "xsim", "data_types", "src", "external")
+
+            def default_files(cond, type_str):
+                """
+                Return name of VHDL file with default VHPIDIRECT foreign declarations.
+                """
+                return [
+                    join(
+                        ext_path,
+                        "external_"
+                        + type_str
+                        + "-"
+                        + ("" if cond else "no")
+                        + "vhpi.vhd",
+                    ),
+                    join(ext_path, "external_" + type_str + "-body.vhd"),
+                ]
+
+            if not files["string"]:
+                files["string"] = default_files(use_ext["string"], "string")
+
+            if not files["integer"]:
+                files["integer"] = default_files(use_ext["integer"], "integer_vector")
+
+            for _, val in files.items():
+                for name in val:
+                    self._add_files(name)
+        else:
+            self._add_files(join(VHDL_PATH, "data_types", "src", "*.vhd"))
+
+            for key in ["string", "integer_vector"]:
+                self._add_files(
+                    pattern=str(
+                        VHDL_PATH
+                        / "data_types"
+                        / "src"
+                        / "api"
+                        / ("external_%s_pkg.vhd" % key)
+                    )
+                    if external is None
+                    or key not in external
+                    or not external[key]
+                    or external[key] is True
+                    else external[key],
+                    allow_empty=False,
                 )
-                if external is None
-                or key not in external
-                or not external[key]
-                or external[key] is True
-                else external[key],
-                allow_empty=False,
-            )
 
     def _add_array_util(self):
         """
@@ -228,17 +285,31 @@ in your VUnit Git repository? You have to do this first if installing using setu
                          }.
         """
         self._add_data_types(external=external)
-        self._add_files(VHDL_PATH / "*.vhd")
-        for path in (
-            "core",
-            "logging",
-            "string_ops",
-            "check",
-            "dictionary",
-            "run",
-            "path",
-        ):
-            self._add_files(VHDL_PATH / path / "src" / "*.vhd")
+        if simulator_is("xsim"):
+            self._add_files(join(VHDL_PATH, "*.vhd"))
+            libraries = [
+                "xsim",
+                "string_ops",
+                "dictionary",
+                "core",
+                "logging",
+                "check",
+                "run",
+            ]
+            self._add_files(join(VHDL_PATH, "xsim", path, "src", "*.vhd"))
+
+        else:
+            self._add_files(join(VHDL_PATH, "*.vhd"))
+            for path in (
+                "core",
+                "logging",
+                "string_ops",
+                "check",
+                "dictionary",
+                "run",
+                "path",
+            ):
+                self._add_files(join(VHDL_PATH, path, "src", "*.vhd"))
 
 
 def osvvm_is_installed():

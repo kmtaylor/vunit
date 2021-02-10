@@ -18,7 +18,7 @@ class IndependentSimTestCase(object):
     A test case to be run in an independent simulation
     """
 
-    def __init__(self, test, config, simulator_if, elaborate_only=False):
+    def __init__(self, test, config, simulator_if, elaborate_only=False, resources=[]):
         self._name = "%s.%s" % (config.library_name, config.design_unit_name)
 
         if not config.is_default:
@@ -30,6 +30,8 @@ class IndependentSimTestCase(object):
             # JUnit XML test reports wants three dotted name hierarchies
             self._name += ".all"
 
+        config.set_resources(resources)
+
         self._configuration = config
 
         self._test = test
@@ -40,6 +42,7 @@ class IndependentSimTestCase(object):
             elaborate_only=elaborate_only,
             test_suite_name=self._name,
             test_cases=[test.name],
+            resources=resources,
         )
 
     @property
@@ -78,11 +81,13 @@ class SameSimTestSuite(object):
     A test suite where multiple test cases are run within the same simulation
     """
 
-    def __init__(self, tests, config, simulator_if, elaborate_only=False):
+    def __init__(self, tests, config, simulator_if, elaborate_only=False, resources=[]):
         self._name = "%s.%s" % (config.library_name, config.design_unit_name)
 
         if not config.is_default:
             self._name += "." + config.name
+
+        config.set_resources(resources)
 
         self._configuration = config
 
@@ -93,6 +98,7 @@ class SameSimTestSuite(object):
             elaborate_only=elaborate_only,
             test_suite_name=self._name,
             test_cases=[test.name for test in tests],
+            resources=resources,
         )
 
     @property
@@ -155,13 +161,20 @@ class TestRun(object):
     """
 
     def __init__(
-        self, simulator_if, config, elaborate_only, test_suite_name, test_cases
+        self,
+        simulator_if,
+        config,
+        elaborate_only,
+        test_suite_name,
+        test_cases,
+        resources,
     ):
         self._simulator_if = simulator_if
         self._config = config
         self._elaborate_only = elaborate_only
         self._test_suite_name = test_suite_name
         self._test_cases = test_cases
+        self._resources = resources
 
     def set_test_cases(self, test_cases):
         self._test_cases = test_cases
@@ -250,6 +263,7 @@ class TestRun(object):
 
         # @TODO Warn if runner cfg already set?
         config.generics["runner_cfg"] = encode_dict(runner_cfg)
+        config.set_resources(self._resources)
 
         return self._simulator_if.simulate(
             output_path=output_path,
