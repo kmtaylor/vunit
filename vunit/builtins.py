@@ -296,7 +296,7 @@ in your VUnit Git repository? You have to do this first if installing using setu
                 "check",
                 "run",
             ]
-            self._add_files(join(VHDL_PATH, "xsim", path, "src", "*.vhd"))
+            self._add_files(join(VHDL_PATH, "xsim", "src", "*.vhd"))
 
         else:
             self._add_files(join(VHDL_PATH, "*.vhd"))
