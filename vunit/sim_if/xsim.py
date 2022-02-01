@@ -2,7 +2,7 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this file,
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 #
-# Copyright (c) 2016, Lars Asplund lars.anders.asplund@gmail.com
+# Copyright (c) 2014-2022, Lars Asplund lars.anders.asplund@gmail.com
 
 """
 Interface for Vivado XSim simulator
@@ -14,18 +14,20 @@ import os
 from os.path import join
 from pathlib import Path
 import shutil
-import subprocess
 import threading
+from shutil import copyfile
 from ..ostools import Process
 from . import SimulatorInterface, StringOption, BooleanOption, ListOfStringOption
 from ..exceptions import CompileError
-from shutil import copyfile
+
 LOGGER = logging.getLogger(__name__)
+
 
 class XSimInterface(SimulatorInterface):
     """
     Interface for Vivado xsim simulator
     """
+
     name = "xsim"
     executable = os.environ.get("XSIM", "xsim")
 
@@ -45,11 +47,11 @@ class XSimInterface(SimulatorInterface):
         """
         group = parser.add_argument_group("xsim", description="Xsim specific flags")
         group.add_argument(
-            "--xsim-vcd-path", default='', help="VCD waveform output path.",
+            "--xsim-vcd-path",
+            default="",
+            help="VCD waveform output path.",
         )
-        group.add_argument(
-            "--xsim-vcd-enable", action="store_true", help="Enable VCD waveform generation."
-        )
+        group.add_argument("--xsim-vcd-enable", action="store_true", help="Enable VCD waveform generation.")
         group.add_argument(
             "--xsim-xelab-limit", action="store_true", help="Limit the xelab current processes to 1 thread."
         )
@@ -62,12 +64,12 @@ class XSimInterface(SimulatorInterface):
         prefix = cls.find_prefix()
 
         return cls(
-            prefix=prefix, 
-            output_path=output_path, 
-            gui=args.gui, 
+            prefix=prefix,
+            output_path=output_path,
+            gui=args.gui,
             vcd_path=args.xsim_vcd_path,
             vcd_enable=args.xsim_vcd_enable,
-            xelab_limit=args.xsim_xelab_limit
+            xelab_limit=args.xsim_xelab_limit,
         )
 
     @classmethod
@@ -78,29 +80,24 @@ class XSimInterface(SimulatorInterface):
         return cls.find_toolchain(["xsim"])
 
     def check_tool(self, tool_name):
-        if os.path.exists(os.path.join(self._prefix, tool_name + '.bat')):
-            return tool_name + '.bat'
-        elif os.path.exists(os.path.join(self._prefix, tool_name)):
+        """
+        Checks to see if a tool exists, with extensions both gor Windows and Linux
+        """
+        if os.path.exists(os.path.join(self._prefix, tool_name + ".bat")):
+            return tool_name + ".bat"
+        if os.path.exists(os.path.join(self._prefix, tool_name)):
             return tool_name
-        raise Exception('Cannot find %s' % tool_name)
+        raise Exception(f"Cannot find {tool_name}")
 
-    def __init__(
-        self, 
-        prefix, 
-        output_path, 
-        gui=False,
-        vcd_path='',
-        vcd_enable=False,
-        xelab_limit=False
-    ):
-        super(XSimInterface, self).__init__(output_path, gui)
+    def __init__(self, prefix, output_path, gui=False, vcd_path="", vcd_enable=False, xelab_limit=False):
+        super().__init__(output_path, gui)
         self._prefix = prefix
         self._libraries = {}
-        self._xvlog = self.check_tool('xvlog')
-        self._xvhdl = self.check_tool('xvhdl')
-        self._xelab = self.check_tool('xelab')
-        self._vivado = self.check_tool('vivado')
-        self._xsim = self.check_tool('xsim')
+        self._xvlog = self.check_tool("xvlog")
+        self._xvhdl = self.check_tool("xvhdl")
+        self._xelab = self.check_tool("xelab")
+        self._vivado = self.check_tool("vivado")
+        self._xsim = self.check_tool("xsim")
         self._vcd_path = vcd_path
         self._vcd_enable = vcd_enable
         self._xelab_limit = xelab_limit
@@ -118,36 +115,39 @@ class XSimInterface(SimulatorInterface):
         """
         Returns the command to compile a single source_file
         """
-        if source_file.file_type == 'vhdl':
+        if source_file.file_type == "vhdl":
             return self.compile_vhdl_file_command(source_file)
-        elif source_file.file_type == 'verilog':
+        if source_file.file_type == "verilog":
             cmd = [join(self._prefix, self._xvlog), source_file.name]
             return self.compile_verilog_file_command(source_file, cmd)
-        elif source_file.file_type == 'systemverilog':
-            cmd = [join(self._prefix, self._xvlog), '--sv', source_file.name]
+        if source_file.file_type == "systemverilog":
+            cmd = [join(self._prefix, self._xvlog), "--sv", source_file.name]
             return self.compile_verilog_file_command(source_file, cmd)
 
         LOGGER.error("Unknown file type: %s", source_file.file_type)
         raise CompileError
 
     def libraries_command(self):
+        """
+        Adds libraries on the command line
+        """
         cmd = []
         for library_name, library_path in self._libraries.items():
             if library_path:
-                cmd += ["-L", '%s=%s' % (library_name, library_path)]
+                cmd += ["-L", f"{library_name}={library_path}"]
             else:
                 cmd += ["-L", library_name]
         return cmd
 
-    def work_library_argument(self, source_file):
-        return ["-work", "%s=%s" % (source_file.library.name,
-                                    source_file.library.directory)]
+    @staticmethod
+    def work_library_argument(source_file):
+        return ["-work", f"{source_file.library.name}={source_file.library.directory}"]
 
     def compile_vhdl_file_command(self, source_file):
         """
         Returns the command to compile a vhdl file
         """
-        cmd = [join(self._prefix, self._xvhdl), source_file.name, '-2008']
+        cmd = [join(self._prefix, self._xvhdl), source_file.name, "-2008"]
         cmd += self.work_library_argument(source_file)
         cmd += self.libraries_command()
         return cmd
@@ -159,36 +159,34 @@ class XSimInterface(SimulatorInterface):
         cmd += self.work_library_argument(source_file)
         cmd += self.libraries_command()
         for include_dir in source_file.include_dirs:
-            cmd += ["--include", "%s" % include_dir]
+            cmd += ["--include", f"{include_dir}"]
         for define_name, define_val in source_file.defines.items():
-            cmd += ["--define", "%s=%s" % (define_name, define_val)]
+            cmd += ["--define", f"{define_name}={define_val}"]
         return cmd
 
-    def _xelab_extra_args(self, config):
+    @staticmethod
+    def _xelab_extra_args(config):
         """
         Determine xelab_extra_args
         """
         xelab_extra_args = []
-        xelab_extra_args = config.sim_options.get(
-            "xsim.xelab_flags", xelab_extra_args
-        )
+        xelab_extra_args = config.sim_options.get("xsim.xelab_flags", xelab_extra_args)
 
         return xelab_extra_args
 
-    def simulate(self,
-                 output_path, test_suite_name, config, elaborate_only):
+    def simulate(self, output_path, test_suite_name, config, elaborate_only):
         """
         Simulate with entity as top level using generics
         """
         runpy_dir = os.path.abspath(str(Path(output_path)) + "../../../../")
 
-        if self._vcd_path == '':
-            vcd_path = os.path.abspath(str(Path(output_path))) + '/wave.vcd'
+        if self._vcd_path == "":
+            vcd_path = os.path.abspath(str(Path(output_path))) + "/wave.vcd"
         else:
             if os.path.isabs(self._vcd_path):
                 vcd_path = self._vcd_path
             else:
-                vcd_path = os.path.abspath(str(Path(runpy_dir))) + '/' + self._vcd_path
+                vcd_path = os.path.abspath(str(Path(runpy_dir))) + "/" + self._vcd_path
 
         cmd = [join(self._prefix, self._xelab)]
         cmd += ["-debug", "typical"]
@@ -203,27 +201,26 @@ class XSimInterface(SimulatorInterface):
         cmd += ["--stats"]
         cmd += ["--O0"]
 
-        snapshot = 'vunit_test'
-        cmd += ['--snapshot', snapshot]
+        snapshot = "vunit_test"
+        cmd += ["--snapshot", snapshot]
 
-        enable_glbl = config.sim_options.get(self.name + '.enable_glbl', None)
+        enable_glbl = config.sim_options.get(self.name + ".enable_glbl", None)
 
-        if (enable_glbl == True):
-            cmd += ["%s.%s" % (config.library_name, 'test_verilog')]
+        if enable_glbl == True:
+            cmd += [f"{config.library_name}.test_verilog"]
         else:
-            cmd += ["%s.%s" % (config.library_name, config.entity_name)]
+            cmd += [f"{config.library_name}.{config.entity_name}"]
 
-        if (enable_glbl == True):
-            cmd += ["%s.%s" % (config.library_name, 'glbl')]
+        if enable_glbl == True:
+            cmd += [f"{config.library_name}.glbl"]
 
-        timescale = config.sim_options.get(self.name + '.timescale', None)
+        timescale = config.sim_options.get(self.name + ".timescale", None)
         if timescale:
-            cmd += ['-timescale', timescale]
+            cmd += ["-timescale", timescale]
         dirname = os.path.dirname(self._libraries[config.library_name])
-        shutil.copytree(dirname, os.path.join(output_path,
-                                              os.path.basename(dirname)))
+        shutil.copytree(dirname, os.path.join(output_path, os.path.basename(dirname)))
         for generic_name, generic_value in config.generics.items():
-            cmd += ["--generic_top", '%s=%s' % (generic_name, generic_value)]
+            cmd += ["--generic_top", f"{generic_name}={generic_value}"]
         if not os.path.exists(output_path):
             os.makedirs(output_path)
 
@@ -232,9 +229,9 @@ class XSimInterface(SimulatorInterface):
         status = True
         try:
             resources = config.get_resources()
-            for x in resources:
-                file_name = os.path.basename(x)
-                copyfile(x,output_path+"/"+file_name)
+            for resource in resources:
+                file_name = os.path.basename(resource)
+                copyfile(resource, output_path + "/" + file_name)
 
             if self._xelab_limit is True:
                 with self._lock:
@@ -259,32 +256,32 @@ class XSimInterface(SimulatorInterface):
                     # Snapshot
                     vivado_cmd += [snapshot]
                     # Mode GUI
-                    vivado_cmd += ['--gui']
+                    vivado_cmd += ["--gui"]
                     # Include tcl
-                    vivado_cmd += ['--tclbatch', tcl_file]
+                    vivado_cmd += ["--tclbatch", tcl_file]
                 # Command line
                 else:
-                   # XSIM binary
+                    # XSIM binary
                     vivado_cmd = [join(self._prefix, self._xsim)]
                     # Snapshot
                     vivado_cmd += [snapshot]
                     # Include tcl
-                    vivado_cmd += ['--tclbatch', tcl_file]
+                    vivado_cmd += ["--tclbatch", tcl_file]
 
-                with open(tcl_file, 'w+') as xsim_startup_file:
+                with open(tcl_file, "w+") as xsim_startup_file:
                     if os.path.exists(vcd_path):
                         os.remove(vcd_path)
 
                     if self._gui == True:
                         if self._vcd_enable:
-                            xsim_startup_file.write(f'open_vcd {vcd_path}\n')
-                            xsim_startup_file.write('log_vcd *\n')
+                            xsim_startup_file.write(f"open_vcd {vcd_path}\n")
+                            xsim_startup_file.write("log_vcd *\n")
                     else:
                         if self._vcd_enable:
-                            xsim_startup_file.write(f'open_vcd {vcd_path}\n')
-                            xsim_startup_file.write('log_vcd *\n')
-                        xsim_startup_file.write('run all\n')
-                        xsim_startup_file.write('quit\n')                
+                            xsim_startup_file.write(f"open_vcd {vcd_path}\n")
+                            xsim_startup_file.write("log_vcd *\n")
+                        xsim_startup_file.write("run all\n")
+                        xsim_startup_file.write("quit\n")
 
                 print(" ".join(vivado_cmd))
 

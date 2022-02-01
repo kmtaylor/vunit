@@ -8,7 +8,6 @@
 Functions to add builtin VHDL code to a project for compilation
 """
 
-from os.path import join, basename
 from pathlib import Path
 from glob import glob
 from warnings import warn
@@ -56,8 +55,8 @@ class Builtins(object):
         """
         supports_context = self._simulator_class.supports_vhdl_contexts() and self._vhdl_standard.supports_context
 
-        for file_name in glob(pattern):
-            base_file_name = basename(file_name)
+        for file_name in get_checked_file_names_from_globs(pattern, allow_empty):
+            base_file_name = Path(file_name).name
 
             standards = set()
             for standard in VHDL.STANDARDS:
@@ -131,9 +130,8 @@ class Builtins(object):
             if not files["integer"]:
                 files["integer"] = default_files(use_ext["integer"], "integer_vector")
 
-            for _, val in files.items():
-                for name in val:
-                    self._add_files(name)
+            for _, name in files.items():
+                self._add_files(name)
         else:
             self._add_files(VHDL_PATH / "data_types" / "src" / "*.vhd")
 
@@ -306,7 +304,7 @@ in your VUnit Git repository? You have to do this first if installing using setu
                 "run",
             ]
             for path in (libraries):
-                if (simulator_is("xsim")):
+                if simulator_is("xsim"):
                     self._add_files(VHDL_PATH / "xsim" / path / "src" / "*.vhd")
                 else:
                     self._add_files(VHDL_PATH / path / "src" / "*.vhd")

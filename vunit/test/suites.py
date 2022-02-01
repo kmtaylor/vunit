@@ -18,7 +18,10 @@ class IndependentSimTestCase(object):
     A test case to be run in an independent simulation
     """
 
-    def __init__(self, test, config, simulator_if, elaborate_only=False, resources=[]):
+    def __init__(self, test, config, simulator_if, elaborate_only=False, resources=None):
+        if resources is None:
+            resources = []
+
         self._name = f"{config.library_name!s}.{config.design_unit_name!s}"
 
         if not config.is_default:
@@ -81,7 +84,10 @@ class SameSimTestSuite(object):
     A test suite where multiple test cases are run within the same simulation
     """
 
-    def __init__(self, tests, config, simulator_if, elaborate_only=False, resources=[]):
+    def __init__(self, tests, config, simulator_if, elaborate_only=False, resources=None):
+        if resources is None:
+            resources = []
+
         self._name = f"{config.library_name!s}.{config.design_unit_name!s}"
 
         if not config.is_default:

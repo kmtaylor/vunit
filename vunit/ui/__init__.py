@@ -957,7 +957,6 @@ avoid location preprocessing of other functions sharing name with a VUnit log or
             fail_fast=self._args.fail_fast,
             dont_catch_exceptions=self._args.dont_catch_exceptions,
             no_color=self._args.no_color,
-            resources=self._resources,
         )
         runner.run(test_cases)
 
