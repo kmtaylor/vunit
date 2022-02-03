@@ -13,9 +13,9 @@ from pathlib import Path
 import traceback
 import threading
 import sys
-import time
 import logging
 import string
+import time
 from contextlib import contextmanager
 from .. import ostools
 from ..hashing import hash_string
