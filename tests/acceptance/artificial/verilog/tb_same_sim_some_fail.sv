@@ -18,7 +18,7 @@ module tb_same_sim_some_fail;
 
       `TEST_CASE("Test 2") begin
          $info("Test 2");
-         $error("");
+         $fatal(1, "");
       end
 
       `TEST_CASE("Test 3") begin

@@ -42,7 +42,7 @@ module check_tb;
       assert ( actual.compare(expected) == 0) else
          begin
             $sformat(err_msg, "CHECK_EQUAL_ERROR: Failure message not as expected.\n RECV: |%f|\n  EXP: |%f|\n", actual, expected);
-            $error(err_msg);
+            $fatal(1, err_msg);
          end;
    endfunction;
    `TEST_SUITE begin
