@@ -15,7 +15,7 @@ module tb_with_runner;
       end
 
       `TEST_CASE("fail") begin
-         $error("fail");
+         $fatal(1, "fail");
       end
    end;
 

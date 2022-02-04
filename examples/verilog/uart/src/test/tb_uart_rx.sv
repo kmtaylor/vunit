@@ -29,7 +29,7 @@ module tb_uart_rx;
          fork : tvalid_low_check
             begin
                wait (tvalid == 1'b1);
-               $error("tvalid should not be high unless data received");
+               $fatal(1, "tvalid should not be high unless data received");
                disable tvalid_low_check;
             end
             begin
