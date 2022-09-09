@@ -13,8 +13,8 @@
 use work.types_pkg.all;
 --use work.external_string_pkg.all;
 
---use work.codec_pkg.all;
---use work.codec_builder_pkg.all;
+use work.codec_pkg.all;
+use work.codec_builder_pkg.all;
 
 package string_ptr_pkg is
 
@@ -97,23 +97,23 @@ package string_ptr_pkg is
     ptr : ptr_t
   ) return string;
 
---  function encode (
---    data : ptr_t
---  ) return string;
---
---  function decode (
---    code : string
---  ) return ptr_t;
---
---  procedure decode (
---    constant code   : string;
---    variable index  : inout positive;
---    variable result : out ptr_t
---  );
---
---  alias encode_ptr_t is encode[ptr_t return string];
---  alias decode_ptr_t is decode[string return ptr_t];
---
---  constant string_ptr_t_code_length : positive := integer_code_length;
+  function encode (
+    data : ptr_t
+  ) return string;
+
+  function decode (
+    code : string
+  ) return ptr_t;
+
+  procedure decode (
+    constant code   : string;
+    variable index  : inout positive;
+    variable result : out ptr_t
+  );
+
+  alias encode_ptr_t is encode[ptr_t return string];
+  alias decode_ptr_t is decode[string return ptr_t];
+
+  constant string_ptr_t_code_length : positive := integer_code_length;
 
 end package;

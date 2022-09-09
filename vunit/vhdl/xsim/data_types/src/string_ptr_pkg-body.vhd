@@ -245,14 +245,16 @@ package body string_ptr_pkg is
             newp(i) := value;
         end loop;
         oldp := st.ptrs(s.id);
-        if min_len > oldp'length - drop then
-          min_len := oldp'length - drop;
+        if oldp /= null then
+          if min_len > oldp'length - drop then
+            min_len := oldp'length - drop;
+          end if;
+          for i in 1 to min_len loop
+            newp(i) := oldp(drop + i);
+          end loop;
+          deallocate(oldp);
         end if;
-        for i in 1 to min_len loop
-          newp(i) := oldp(drop + i);
-        end loop;
         st.ptrs(s.id) := newp;
-        deallocate(oldp);
       when others =>
         -- @TODO Implement resize for external models
         check_external(ptr, "resize");
@@ -286,28 +288,28 @@ package body string_ptr_pkg is
     return (ref => value);
   end;
 
---  function encode (
---    data : ptr_t
---  ) return string is begin
---    return encode(data.ref);
---  end;
---
---  function decode (
---    code : string
---  ) return ptr_t is
---    variable ret_val : ptr_t;
---    variable index   : positive := code'left;
---  begin
---    decode(code, index, ret_val);
---    return ret_val;
---  end;
---
---  procedure decode (
---    constant code   : string;
---    variable index  : inout positive;
---    variable result : out ptr_t
---  ) is begin
---    decode(code, index, result.ref);
---  end;
+  function encode (
+    data : ptr_t
+  ) return string is begin
+    return encode(data.ref);
+  end;
+
+  function decode (
+    code : string
+  ) return ptr_t is
+    variable ret_val : ptr_t;
+    variable index   : positive := code'left;
+  begin
+    decode(code, index, ret_val);
+    return ret_val;
+  end;
+
+  procedure decode (
+    constant code   : string;
+    variable index  : inout positive;
+    variable result : out ptr_t
+  ) is begin
+    decode(code, index, result.ref);
+  end;
 
 end package body;
