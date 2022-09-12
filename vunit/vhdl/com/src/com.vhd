@@ -9,7 +9,7 @@
 library ieee;
 use ieee.std_logic_1164.all;
 
-context work.vunit_context;
+--context work.vunit_context;
 
 use work.queue_pkg.all;
 use work.queue_2008p_pkg.all;
@@ -20,7 +20,7 @@ use work.codec_pkg.all;
 use work.com_support_pkg.all;
 use work.com_messenger_pkg.all;
 use work.com_common_pkg.all;
-use work.logger_pkg.all;
+--use work.logger_pkg.all;
 
 use std.textio.all;
 
@@ -262,7 +262,7 @@ package body com_pkg is
     variable msg : msg_t;
   begin
     if position > messenger.num_of_messages(actor, mailbox_id) - 1 then
-      failure(com_logger, "Peeking non-existing position.");
+--      failure(com_logger, "Peeking non-existing position.");
       return msg;
     end if;
 

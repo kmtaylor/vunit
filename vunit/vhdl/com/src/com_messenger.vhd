@@ -13,8 +13,8 @@ use work.queue_pkg.all;
 use work.queue_pool_pkg.all;
 use work.string_ptr_pkg.all;
 use work.codec_pkg.all;
-use work.logger_pkg.all;
-use work.log_levels_pkg.all;
+--use work.logger_pkg.all;
+--use work.log_levels_pkg.all;
 
 use std.textio.all;
 
@@ -193,7 +193,7 @@ package body com_messenger_pkg is
     next_item : subscriber_item_ptr_t;
   end record subscriber_item_t;
 
-  type subscribers_t is array (subscription_traffic_type_t range published to inbound) of subscriber_item_ptr_t;
+--  type subscribers_t is array (subscription_traffic_type_t range published to inbound) of subscriber_item_ptr_t;
 
   type actor_item_t is record
     actor             : actor_t;
@@ -202,7 +202,10 @@ package body com_messenger_pkg is
     inbox             : mailbox_ptr_t;
     outbox            : mailbox_ptr_t;
     reply_stash       : envelope_ptr_t;
-    subscribers       : subscribers_t;
+    subscribers_p     : subscriber_item_ptr_t;
+    subscribers_o     : subscriber_item_ptr_t;
+    subscribers_i     : subscriber_item_ptr_t;
+--    subscribers       : subscribers_t;
   end record actor_item_t;
 
   type actor_item_array_t is array (natural range <>) of actor_item_t;
@@ -217,7 +220,10 @@ package body com_messenger_pkg is
         inbox             => create(0),
         outbox            => create(0),
         reply_stash       => null,
-        subscribers       => (null, null, null));  --
+        subscribers_p     => null,
+        subscribers_o     => null,
+        subscribers_i     => null);
+--        subscribers       => (null, null, null));  --
     variable envelope_recycle_bin : envelope_ptr_array(1 to 1000);
     variable n_recycled_envelopes : natural      := 0;
     variable null_message         : message_t    := (no_message_id, null_msg_type, ok, null_actor,
@@ -262,6 +268,7 @@ package body com_messenger_pkg is
   end function init_actors;
 
   variable actors : actor_item_array_ptr_t := init_actors;
+  variable num_actors : natural := 1;
 
   impure function find_actor (name : string) return actor_t is
     variable ret_val : actor_t;
@@ -285,16 +292,17 @@ package body com_messenger_pkg is
     variable old_actors : actor_item_array_ptr_t;
   begin
     old_actors := actors;
-    actors     := new actor_item_array_t(0 to actors'length);
+    actors     := new actor_item_array_t(0 to num_actors);
     actors(0)  := null_actor_item;
     for i in old_actors'range loop
       actors(i) := old_actors(i);
     end loop;
     deallocate(old_actors);
-    actors(actors'length - 1) := ((id => actors'length - 1), new string'(name),
-                                  deferred_creation, create(inbox_size), create(outbox_size), null, (null, null, null));
+    actors(num_actors) := ((id => num_actors), new string'(name),
+                           deferred_creation, create(inbox_size), create(outbox_size), null, null, null, null);
 
-    return actors(actors'length - 1).actor;
+    num_actors := num_actors + 1;
+    return actors(num_actors - 1).actor;
   end function;
 
   impure function find (name : string; enable_deferred_creation : boolean := true) return actor_t is
@@ -344,8 +352,16 @@ package body com_messenger_pkg is
     subscriber   : actor_t;
     publisher    : actor_t;
     traffic_type : subscription_traffic_type_t) return boolean is
-    variable item : subscriber_item_ptr_t := actors(publisher.id).subscribers(traffic_type);
+    variable item : subscriber_item_ptr_t;
   begin
+    case traffic_type is
+      when published =>
+        item := actors(publisher.id).subscribers_p;
+      when outbound =>
+        item := actors(publisher.id).subscribers_o;
+      when inbound =>
+        item := actors(publisher.id).subscribers_i;
+    end case;
     while item /= null loop
       if item.actor = subscriber then
         return true;
@@ -359,12 +375,26 @@ package body com_messenger_pkg is
   procedure remove_subscriber (subscriber : actor_t; publisher : actor_t; traffic_type : subscription_traffic_type_t) is
     variable item, previous_item : subscriber_item_ptr_t;
   begin
-    item          := actors(publisher.id).subscribers(traffic_type);
+    case traffic_type is
+      when published =>
+        item := actors(publisher.id).subscribers_p;
+      when outbound =>
+        item := actors(publisher.id).subscribers_o;
+      when inbound =>
+        item := actors(publisher.id).subscribers_i;
+    end case;
     previous_item := null;
     while item /= null loop
       if item.actor = subscriber then
         if previous_item = null then
-          actors(publisher.id).subscribers(traffic_type) := item.next_item;
+          case traffic_type is
+            when published =>
+              actors(publisher.id).subscribers_p := item.next_item;
+            when outbound =>
+              actors(publisher.id).subscribers_o := item.next_item;
+            when inbound =>
+              actors(publisher.id).subscribers_i := item.next_item;
+          end case;
         else
           previous_item.next_item := item.next_item;
         end if;
@@ -392,11 +422,26 @@ package body com_messenger_pkg is
     end loop;
 
     for t in subscription_traffic_type_t'left to subscription_traffic_type_t'right loop
-      while actors(actor.id).subscribers(t) /= null loop
-        item                            := actors(actor.id).subscribers(t);
-        actors(actor.id).subscribers(t) := item.next_item;
-        deallocate(item);
-      end loop;
+      case t is
+        when published =>
+          while actors(actor.id).subscribers_p /= null loop
+            item                            := actors(actor.id).subscribers_p;
+            actors(actor.id).subscribers_p := item.next_item;
+            deallocate(item);
+          end loop;
+        when outbound =>
+          while actors(actor.id).subscribers_o /= null loop
+            item                            := actors(actor.id).subscribers_o;
+            actors(actor.id).subscribers_o := item.next_item;
+            deallocate(item);
+          end loop;
+        when inbound =>
+          while actors(actor.id).subscribers_i /= null loop
+            item                            := actors(actor.id).subscribers_i;
+            actors(actor.id).subscribers_i := item.next_item;
+            deallocate(item);
+          end loop;
+      end case;
     end loop;
 
     for i in actors'range loop
@@ -473,7 +518,7 @@ package body com_messenger_pkg is
 
   impure function unknown_actor (actor : actor_t) return boolean is
   begin
-    if (actor.id = 0) or (actor.id > actors'length - 1) then
+    if (actor.id = 0) or (actor.id > num_actors - 1) then
       return true;
     elsif actors(actor.id).actor = null_actor then
       return true;
@@ -529,14 +574,21 @@ package body com_messenger_pkg is
       while item /= null loop
         result := is_full(item.actor, inbox);
         exit when result;
-        has_full_inboxes(actors(item.actor.id).subscribers(inbound), result);
+        has_full_inboxes(actors(item.actor.id).subscribers_i, result);
         exit when result;
         item   := item.next_item;
       end loop;
     end;
   begin
     for t in subscription_traffic_types'range loop
-      has_full_inboxes(actors(publisher.id).subscribers(subscription_traffic_types(t)), result(t));
+      case subscription_traffic_types(t) is
+        when published =>
+          has_full_inboxes(actors(publisher.id).subscribers_p, result(t));
+        when outbound =>
+          has_full_inboxes(actors(publisher.id).subscribers_o, result(t));
+        when inbound =>
+          has_full_inboxes(actors(publisher.id).subscribers_i, result(t));
+      end case;
     end loop;
 
     return or result;
@@ -546,7 +598,14 @@ package body com_messenger_pkg is
     actor                     : actor_t;
     subscription_traffic_type : subscription_traffic_type_t := published) return boolean is
   begin
-    return actors(actor.id).subscribers(subscription_traffic_type) /= null;
+    case subscription_traffic_type is
+      when published =>
+        return actors(actor.id).subscribers_p /= null;
+      when outbound =>
+        return actors(actor.id).subscribers_o /= null;
+      when inbound =>
+        return actors(actor.id).subscribers_i /= null;
+    end case;
   end;
 
   impure function mailbox_size (actor : actor_t; mailbox_id : mailbox_id_t) return natural is
@@ -599,7 +658,7 @@ package body com_messenger_pkg is
   begin
     check(not unknown_actor(sender), unknown_publisher_error);
 
-    subscriber_item := actors(sender.id).subscribers(published);
+    subscriber_item := actors(sender.id).subscribers_p;
     while subscriber_item /= null loop
       send(sender, subscriber_item.actor, inbox, no_message_id, payload, receipt);
       subscriber_item := subscriber_item.next_item;
@@ -657,9 +716,9 @@ package body com_messenger_pkg is
       end loop;
     end if;
 
-    if is_visible(com_logger, trace) then
-      trace(com_logger, "[" & to_string(msg) & "] => " & name(receiver) & " " & mailbox_id_t'image(mailbox_id));
-    end if;
+--    if is_visible(com_logger, trace) then
+--      trace(com_logger, "[" & to_string(msg) & "] => " & name(receiver) & " " & mailbox_id_t'image(mailbox_id));
+--    end if;
 
     envelope                    := new_envelope;
     envelope.message.id         := msg.id;
@@ -709,8 +768,17 @@ package body com_messenger_pkg is
     msg.sender := sender;
 
     for t in subscriber_traffic_types'range loop
-      put_subscriber_messages(actors(sender.id).subscribers(subscriber_traffic_types(t)),
-                              msg, set_msg_receiver => true);
+      case subscriber_traffic_types(t) is
+        when published =>
+          put_subscriber_messages(actors(sender.id).subscribers_p,
+                                  msg, set_msg_receiver => true);
+        when outbound =>
+          put_subscriber_messages(actors(sender.id).subscribers_o,
+                                  msg, set_msg_receiver => true);
+        when inbound =>
+          put_subscriber_messages(actors(sender.id).subscribers_i,
+                                  msg, set_msg_receiver => true);
+      end case;
     end loop;
 
     msg.receiver := null_actor;
@@ -722,8 +790,17 @@ package body com_messenger_pkg is
     constant subscriber_traffic_types : in    subscription_traffic_types_t) is
   begin
     for t in subscriber_traffic_types'range loop
-      put_subscriber_messages(actors(sender.id).subscribers(subscriber_traffic_types(t)),
-                              msg, set_msg_receiver => false);
+      case subscriber_traffic_types(t) is
+        when published =>
+          put_subscriber_messages(actors(sender.id).subscribers_p,
+                                  msg, set_msg_receiver => false);
+        when outbound =>
+          put_subscriber_messages(actors(sender.id).subscribers_o,
+                                  msg, set_msg_receiver => false);
+        when inbound =>
+          put_subscriber_messages(actors(sender.id).subscribers_i,
+                                  msg, set_msg_receiver => false);
+      end case;
     end loop;
   end;
 
@@ -893,14 +970,14 @@ package body com_messenger_pkg is
     get_envelope(actor, position, mailbox_id, mailbox, envelope, previous_envelope);
 
     if envelope /= null then
-      if is_visible(com_logger, trace) then
-        msg.id := envelope.message.id;
-        msg.msg_type := envelope.message.msg_type;
-        msg.sender := envelope.message.sender;
-        msg.receiver := envelope.message.receiver;
-        msg.request_id := envelope.message.request_id;
-        trace(com_logger, name(actor) & " " & mailbox_id_t'image(mailbox_id) & " => [" & to_string(msg) & "]");
-      end if;
+--      if is_visible(com_logger, trace) then
+--        msg.id := envelope.message.id;
+--        msg.msg_type := envelope.message.msg_type;
+--        msg.sender := envelope.message.sender;
+--        msg.receiver := envelope.message.receiver;
+--        msg.request_id := envelope.message.request_id;
+--        trace(com_logger, name(actor) & " " & mailbox_id_t'image(mailbox_id) & " => [" & to_string(msg) & "]");
+--      end if;
 
       deallocate(envelope.message.payload);
 
@@ -1081,14 +1158,14 @@ package body com_messenger_pkg is
     end if;
 
     if traffic_type = published then
-      new_subscriber                              := new subscriber_item_t'(subscriber, actors(publisher.id).subscribers(published));
-      actors(publisher.id).subscribers(published) := new_subscriber;
+      new_subscriber                              := new subscriber_item_t'(subscriber, actors(publisher.id).subscribers_p);
+      actors(publisher.id).subscribers_p          := new_subscriber;
     elsif traffic_type = outbound then
-      new_subscriber                             := new subscriber_item_t'(subscriber, actors(publisher.id).subscribers(outbound));
-      actors(publisher.id).subscribers(outbound) := new_subscriber;
+      new_subscriber                             := new subscriber_item_t'(subscriber, actors(publisher.id).subscribers_o);
+      actors(publisher.id).subscribers_o         := new_subscriber;
     else
-      new_subscriber                            := new subscriber_item_t'(subscriber, actors(publisher.id).subscribers(inbound));
-      actors(publisher.id).subscribers(inbound) := new_subscriber;
+      new_subscriber                            := new subscriber_item_t'(subscriber, actors(publisher.id).subscribers_i);
+      actors(publisher.id).subscribers_i        := new_subscriber;
     end if;
   end procedure subscribe;
 
@@ -1114,7 +1191,14 @@ package body com_messenger_pkg is
     begin
       for a in actors'range loop
         for t in subscription_traffic_type_t'left to subscription_traffic_type_t'right loop
-          item := actors(a).subscribers(t);
+          case t is
+            when published =>
+              item := actors(a).subscribers_p;
+            when outbound =>
+              item := actors(a).subscribers_o;
+            when inbound =>
+              item := actors(a).subscribers_i;
+          end case;
           while item /= null loop
             if item.actor = subscriber then
               n_subscriptions := n_subscriptions + 1;
@@ -1134,7 +1218,14 @@ package body com_messenger_pkg is
   begin
     for a in actors'range loop
       for t in subscription_traffic_type_t'left to subscription_traffic_type_t'right loop
-        item := actors(a).subscribers(t);
+        case t is
+          when published =>
+            item := actors(a).subscribers_p;
+          when outbound =>
+            item := actors(a).subscribers_o;
+          when inbound =>
+            item := actors(a).subscribers_i;
+        end case;
         while item /= null loop
           if item.actor = subscriber then
             subscriptions(idx).subscriber := subscriber;
@@ -1156,7 +1247,14 @@ package body com_messenger_pkg is
       variable item : subscriber_item_ptr_t;
     begin
       for t in subscription_traffic_type_t'left to subscription_traffic_type_t'right loop
-        item := actors(publisher.id).subscribers(t);
+        case t is
+          when published =>
+            item := actors(publisher.id).subscribers_p;
+          when outbound =>
+            item := actors(publisher.id).subscribers_o;
+          when inbound =>
+            item := actors(publisher.id).subscribers_i;
+        end case;
         while item /= null loop
           n_subscriptions := n_subscriptions + 1;
           item := item.next_item;
@@ -1171,7 +1269,14 @@ package body com_messenger_pkg is
     variable idx : natural := 0;
   begin
     for t in subscription_traffic_type_t'left to subscription_traffic_type_t'right loop
-      item := actors(publisher.id).subscribers(t);
+      case t is
+        when published =>
+          item := actors(publisher.id).subscribers_p;
+        when outbound =>
+          item := actors(publisher.id).subscribers_o;
+        when inbound =>
+          item := actors(publisher.id).subscribers_i;
+      end case;
       while item /= null loop
         subscriptions(idx).subscriber := item.actor;
         subscriptions(idx).publisher := publisher;
