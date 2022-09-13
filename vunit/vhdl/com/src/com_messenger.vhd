@@ -7,6 +7,9 @@
 --
 -- Copyright (c) 2014-2022, Lars Asplund lars.anders.asplund@gmail.com
 
+library ieee;
+use ieee.numeric_std.all;
+
 use work.com_types_pkg.all;
 use work.com_support_pkg.all;
 use work.queue_pkg.all;
@@ -112,26 +115,26 @@ package com_messenger_pkg is
       position   : natural      := 0;
       mailbox_id : mailbox_id_t := inbox);
 
-    impure function has_reply_stash_message (
-      actor      : actor_t;
-      request_id : message_id_t := no_message_id)
-      return boolean;                   --
-    impure function get_reply_stash_message_payload (actor    : actor_t) return string;
-    impure function get_reply_stash_message_sender (actor     : actor_t) return actor_t;
-    impure function get_reply_stash_message_receiver (actor     : actor_t) return actor_t;
-    impure function get_reply_stash_message_id (actor         : actor_t) return message_id_t;
-    impure function get_reply_stash_message_request_id (actor : actor_t) return message_id_t;
+--    impure function has_reply_stash_message (
+--      actor      : actor_t;
+--      request_id : message_id_t := no_message_id)
+--      return boolean;                   --
+--    impure function get_reply_stash_message_payload (actor    : actor_t) return string;
+--    impure function get_reply_stash_message_sender (actor     : actor_t) return actor_t;
+--    impure function get_reply_stash_message_receiver (actor     : actor_t) return actor_t;
+--    impure function get_reply_stash_message_id (actor         : actor_t) return message_id_t;
+--    impure function get_reply_stash_message_request_id (actor : actor_t) return message_id_t;
     impure function find_reply_message (
       actor      : actor_t;
       request_id : message_id_t;
       mailbox_id : mailbox_id_t := inbox)
       return integer;
-    impure function find_and_stash_reply_message (
-      actor      : actor_t;
-      request_id : message_id_t;
-      mailbox_id : mailbox_id_t := inbox)
-      return boolean;
-    procedure clear_reply_stash (actor : actor_t);
+--    impure function find_and_stash_reply_message (
+--      actor      : actor_t;
+--      request_id : message_id_t;
+--      mailbox_id : mailbox_id_t := inbox)
+--      return boolean;
+--    procedure clear_reply_stash (actor : actor_t);
 
     procedure subscribe (
       subscriber   : actor_t;
@@ -161,37 +164,57 @@ package com_messenger_pkg is
 end package com_messenger_pkg;
 
 package body com_messenger_pkg is
-  type envelope_t;
-  type envelope_ptr_t is access envelope_t;
+--  type envelope_t;
+--  type envelope_ptr_t is access envelope_t;
+--
+--  type envelope_t is record
+--    message       : message_t;
+--    next_envelope : envelope_ptr_t;
+--  end record envelope_t;
+--  type envelope_ptr_array is array (positive range <>) of envelope_ptr_t;
 
-  type envelope_t is record
-    message       : message_t;
-    next_envelope : envelope_ptr_t;
-  end record envelope_t;
-  type envelope_ptr_array is array (positive range <>) of envelope_ptr_t;
+  type message_array_t is array (natural range <>) of message_t;
 
   type mailbox_t is record
-    num_of_messages : natural;
-    size            : natural;
-    first_envelope  : envelope_ptr_t;
-    last_envelope   : envelope_ptr_t;
+    messages  : message_array_t(0 to 2**12-1);
+    head      : unsigned(11 downto 0);
+    tail      : unsigned(11 downto 0);
   end record mailbox_t;
-  type mailbox_ptr_t is access mailbox_t;
 
-  impure function create(size : natural := natural'high)
-    return mailbox_ptr_t is
+  function count_messages(mbox : mailbox_t)
+    return natural is
   begin
-    return new mailbox_t'(0, size, null, null);
-  end function create;
+    return to_integer(mbox.head - mbox.tail);
+  end;
 
-  -- TODO: subscriber can be simplified to a pointer to an array.
-  type subscriber_item_t;
-  type subscriber_item_ptr_t is access subscriber_item_t;
+--  type mailbox_ptr_t is access mailbox_t;
+--
+--  impure function create(size : natural := natural'high)
+--    return mailbox_ptr_t is
+--  begin
+--    return new mailbox_t'(0, size, null, null);
+--  end function create;
+--
+--  -- TODO: subscriber can be simplified to a pointer to an array.
+--  type subscriber_item_t;
+--  type subscriber_item_ptr_t is access subscriber_item_t;
+--
+--  type subscriber_item_t is record
+--    actor     : actor_t;
+--    next_item : subscriber_item_ptr_t;
+--  end record subscriber_item_t;
 
   type subscriber_item_t is record
-    actor     : actor_t;
-    next_item : subscriber_item_ptr_t;
+    actors    : actor_vec_t(0 to 2**8-1);
+    head      : unsigned(7 downto 0);
+    tail      : unsigned(7 downto 0);
   end record subscriber_item_t;
+
+  function count_subscribers(subs : subscriber_item_t)
+    return natural is
+  begin
+    return to_integer(subs.head - subs.tail);
+  end;
 
 --  type subscribers_t is array (subscription_traffic_type_t range published to inbound) of subscriber_item_ptr_t;
 
@@ -199,35 +222,35 @@ package body com_messenger_pkg is
     actor             : actor_t;
     name              : line;
     deferred_creation : boolean;
-    inbox             : mailbox_ptr_t;
-    outbox            : mailbox_ptr_t;
-    reply_stash       : envelope_ptr_t;
-    subscribers_p     : subscriber_item_ptr_t;
-    subscribers_o     : subscriber_item_ptr_t;
-    subscribers_i     : subscriber_item_ptr_t;
+    inbox             : mailbox_t;
+    outbox            : mailbox_t;
+--    reply_stash       : envelope_ptr_t;
+    subscribers_p     : subscriber_item_t;
+    subscribers_o     : subscriber_item_t;
+    subscribers_i     : subscriber_item_t;
 --    subscribers       : subscribers_t;
   end record actor_item_t;
 
   type actor_item_array_t is array (natural range <>) of actor_item_t;
   type actor_item_array_ptr_t is access actor_item_array_t;
 
-  type messenger_t is protected
-    body
-      variable null_actor_item : actor_item_t := (
-        actor             => null_actor,
-        name              => null,
-        deferred_creation => false,
-        inbox             => create(0),
-        outbox            => create(0),
-        reply_stash       => null,
-        subscribers_p     => null,
-        subscribers_o     => null,
-        subscribers_i     => null);
---        subscribers       => (null, null, null));  --
-    variable envelope_recycle_bin : envelope_ptr_array(1 to 1000);
-    variable n_recycled_envelopes : natural      := 0;
+  type messenger_t is protected body
     variable null_message         : message_t    := (no_message_id, null_msg_type, ok, null_actor,
-                                                     null_actor, no_message_id, null);
+                                                     null_actor, no_message_id, (others => nul));
+
+    variable null_actor_item : actor_item_t := (
+      actor             => null_actor,
+      name              => null,
+      deferred_creation => false,
+      inbox             => ((others => null_message), (others => '0'), (others => '0')),
+      outbox            => ((others => null_message), (others => '0'), (others => '0')),
+--        reply_stash       => null,
+      subscribers_p     => ((others => null_actor), (others => '0'), (others => '0')),
+      subscribers_o     => ((others => null_actor), (others => '0'), (others => '0')),
+      subscribers_i     => ((others => null_actor), (others => '0'), (others => '0')));
+
+--    variable envelope_recycle_bin : envelope_ptr_array(1 to 1000);
+--    variable n_recycled_envelopes : natural      := 0;
     variable next_message_id      : message_id_t := no_message_id + 1;
     variable timeout_allowed      : boolean      := false;
     variable deprecated_allowed   : boolean      := false;
@@ -235,28 +258,28 @@ package body com_messenger_pkg is
     -----------------------------------------------------------------------------
     -- Handling of actors
     -----------------------------------------------------------------------------
-    impure function new_envelope return envelope_ptr_t is
-    begin
-      if n_recycled_envelopes > 0 then
-        n_recycled_envelopes                                         := n_recycled_envelopes - 1;
-        envelope_recycle_bin(n_recycled_envelopes + 1).message       := null_message;
-        envelope_recycle_bin(n_recycled_envelopes + 1).next_envelope := null;
-        return envelope_recycle_bin(n_recycled_envelopes + 1);
-      else
-        return new envelope_t;
-      end if;
-    end new_envelope;
-
-  procedure deallocate_envelope (ptr : inout envelope_ptr_t) is
-  begin
-    if (n_recycled_envelopes < envelope_recycle_bin'length) and (ptr /= null) then
-      n_recycled_envelopes                       := n_recycled_envelopes + 1;
-      envelope_recycle_bin(n_recycled_envelopes) := ptr;
-      ptr                                        := null;
-    else
-      deallocate(ptr);
-    end if;
-  end deallocate_envelope;
+--    impure function new_envelope return envelope_ptr_t is
+--    begin
+--      if n_recycled_envelopes > 0 then
+--        n_recycled_envelopes                                         := n_recycled_envelopes - 1;
+--        envelope_recycle_bin(n_recycled_envelopes + 1).message       := null_message;
+--        envelope_recycle_bin(n_recycled_envelopes + 1).next_envelope := null;
+--        return envelope_recycle_bin(n_recycled_envelopes + 1);
+--      else
+--        return new envelope_t;
+--      end if;
+--    end new_envelope;
+--
+--  procedure deallocate_envelope (ptr : inout envelope_ptr_t) is
+--  begin
+--    if (n_recycled_envelopes < envelope_recycle_bin'length) and (ptr /= null) then
+--      n_recycled_envelopes                       := n_recycled_envelopes + 1;
+--      envelope_recycle_bin(n_recycled_envelopes) := ptr;
+--      ptr                                        := null;
+--    else
+--      deallocate(ptr);
+--    end if;
+--  end deallocate_envelope;
 
   impure function init_actors return actor_item_array_ptr_t is
     variable ret_val : actor_item_array_ptr_t;
@@ -287,7 +310,7 @@ package body com_messenger_pkg is
     name              :    string  := "";
     deferred_creation : in boolean := false;
     inbox_size        : in natural := natural'high;
-    outbox_size        : in natural := natural'high)
+    outbox_size       : in natural := natural'high)
     return actor_t is
     variable old_actors : actor_item_array_ptr_t;
   begin
@@ -298,8 +321,12 @@ package body com_messenger_pkg is
       actors(i) := old_actors(i);
     end loop;
     deallocate(old_actors);
-    actors(num_actors) := ((id => num_actors), new string'(name),
-                           deferred_creation, create(inbox_size), create(outbox_size), null, null, null, null);
+    actors(num_actors) := ((id => num_actors), new string'(name), deferred_creation,
+                           ((others => null_message), (others => '0'), (others => '0')),
+                           ((others => null_message), (others => '0'), (others => '0')),
+                           ((others => null_actor), (others => '0'), (others => '0')),
+                           ((others => null_actor), (others => '0'), (others => '0')),
+                           ((others => null_actor), (others => '0'), (others => '0')));
 
     num_actors := num_actors + 1;
     return actors(num_actors - 1).actor;
@@ -339,8 +366,8 @@ package body com_messenger_pkg is
       actor := create_actor(name, false, inbox_size, outbox_size);
     elsif actors(actor.id).deferred_creation then
       actors(actor.id).deferred_creation := false;
-      actors(actor.id).inbox.size        := inbox_size;
-      actors(actor.id).outbox.size       := outbox_size;
+--      actors(actor.id).inbox.size        := inbox_size;
+--      actors(actor.id).outbox.size       := outbox_size;
     else
       check_failed(duplicate_actor_name_error);
     end if;
@@ -349,100 +376,91 @@ package body com_messenger_pkg is
   end;
 
   impure function is_subscriber (
+    subscribers  : subscriber_item_t;
+    subscriber   : actor_t) return boolean is
+    variable n_subs : natural := count_subscribers(subscribers);
+    variable ptr    : natural := to_integer(subscribers.tail);
+  begin
+    for i in 0 to n_subs-1 loop
+      if subscribers.actors(ptr) = subscriber then
+        return true;
+      end if;
+      ptr := (ptr + 1) mod 256;
+    end loop;
+    return false;
+  end;
+
+  impure function is_subscriber (
     subscriber   : actor_t;
     publisher    : actor_t;
     traffic_type : subscription_traffic_type_t) return boolean is
-    variable item : subscriber_item_ptr_t;
   begin
     case traffic_type is
       when published =>
-        item := actors(publisher.id).subscribers_p;
+        if is_subscriber(actors(publisher.id).subscribers_p, subscriber) then
+          return true;
+        end if;
       when outbound =>
-        item := actors(publisher.id).subscribers_o;
+        if is_subscriber(actors(publisher.id).subscribers_o, subscriber) then
+          return true;
+        end if;
       when inbound =>
-        item := actors(publisher.id).subscribers_i;
+        if is_subscriber(actors(publisher.id).subscribers_i, subscriber) then
+          return true;
+        end if;
     end case;
-    while item /= null loop
-      if item.actor = subscriber then
-        return true;
-      end if;
-      item := item.next_item;
-    end loop;
 
     return false;
   end;
 
+
+  procedure remove_subscriber (subscribers : inout subscriber_item_t; subscriber : actor_t; found : inout boolean) is
+    variable llist  : actor_vec_t(0 to 2**8-1);
+    variable lptr   : natural := 0;
+    variable n_subs : natural := count_subscribers(subscribers);
+    variable ptr    : natural := to_integer(subscribers.tail);
+  begin
+    for i in 0 to n_subs-1 loop
+      if subscribers.actors(ptr) /= subscriber then
+        llist(lptr) := subscribers.actors(ptr);
+      else
+        found := true;
+      end if;
+      lptr := lptr + 1;
+      ptr := (ptr + 1) mod 256;
+    end loop;
+    if not found then
+      return;
+    end if;
+    -- Flush list
+    subscribers.tail := to_unsigned(ptr, 8);
+    for i in 0 to n_subs-2 loop
+      subscribers.actors(ptr) := llist(i);
+      ptr := (ptr + 1) mod 256;
+    end loop;
+    subscribers.head := to_unsigned(ptr, 8); 
+  end;
+
   procedure remove_subscriber (subscriber : actor_t; publisher : actor_t; traffic_type : subscription_traffic_type_t) is
-    variable item, previous_item : subscriber_item_ptr_t;
+    variable found : boolean;
   begin
     case traffic_type is
       when published =>
-        item := actors(publisher.id).subscribers_p;
+        remove_subscriber(actors(publisher.id).subscribers_p, subscriber, found);
       when outbound =>
-        item := actors(publisher.id).subscribers_o;
+        remove_subscriber(actors(publisher.id).subscribers_o, subscriber, found);
       when inbound =>
-        item := actors(publisher.id).subscribers_i;
+        remove_subscriber(actors(publisher.id).subscribers_i, subscriber, found);
     end case;
-    previous_item := null;
-    while item /= null loop
-      if item.actor = subscriber then
-        if previous_item = null then
-          case traffic_type is
-            when published =>
-              actors(publisher.id).subscribers_p := item.next_item;
-            when outbound =>
-              actors(publisher.id).subscribers_o := item.next_item;
-            when inbound =>
-              actors(publisher.id).subscribers_i := item.next_item;
-          end case;
-        else
-          previous_item.next_item := item.next_item;
-        end if;
-        deallocate(item);
-        return;
-      end if;
-      previous_item := item;
-      item          := item.next_item;
-    end loop;
 
-    check_failed(not_a_subscriber_error);
+    if not found then
+      check_failed(not_a_subscriber_error);
+    end if;
   end;
 
   procedure destroy (actor : inout actor_t) is
-    variable envelope           : envelope_ptr_t;
-    variable item               : subscriber_item_ptr_t;
   begin
     check(not unknown_actor(actor), unknown_actor_error);
-
-    while actors(actor.id).inbox.first_envelope /= null loop
-      envelope                              := actors(actor.id).inbox.first_envelope;
-      actors(actor.id).inbox.first_envelope := envelope.next_envelope;
-      deallocate(envelope.message.payload);
-      deallocate_envelope(envelope);
-    end loop;
-
-    for t in subscription_traffic_type_t'left to subscription_traffic_type_t'right loop
-      case t is
-        when published =>
-          while actors(actor.id).subscribers_p /= null loop
-            item                            := actors(actor.id).subscribers_p;
-            actors(actor.id).subscribers_p := item.next_item;
-            deallocate(item);
-          end loop;
-        when outbound =>
-          while actors(actor.id).subscribers_o /= null loop
-            item                            := actors(actor.id).subscribers_o;
-            actors(actor.id).subscribers_o := item.next_item;
-            deallocate(item);
-          end loop;
-        when inbound =>
-          while actors(actor.id).subscribers_i /= null loop
-            item                            := actors(actor.id).subscribers_i;
-            actors(actor.id).subscribers_i := item.next_item;
-            deallocate(item);
-          end loop;
-      end case;
-    end loop;
 
     for i in actors'range loop
       for t in subscription_traffic_type_t'left to subscription_traffic_type_t'right loop
@@ -453,8 +471,6 @@ package body com_messenger_pkg is
     end loop;
 
     deallocate(actors(actor.id).name);
-    deallocate(actors(actor.id).inbox);
-    deallocate(actors(actor.id).outbox);
     actors(actor.id) := null_actor_item;
     actor            := null_actor;
   end;
@@ -535,30 +551,23 @@ package body com_messenger_pkg is
   impure function is_full (actor : actor_t; mailbox_id : mailbox_id_t) return boolean is
   begin
     if mailbox_id = inbox then
-      return actors(actor.id).inbox.num_of_messages >= actors(actor.id).inbox.size;
+      return count_messages(actors(actor.id).inbox) = 255;
     else
-      return actors(actor.id).outbox.num_of_messages >= actors(actor.id).outbox.size;
+      return count_messages(actors(actor.id).outbox) = 255;
     end if;
   end function;
 
   impure function num_of_messages (actor : actor_t; mailbox_id : mailbox_id_t) return natural is
   begin
     if mailbox_id = inbox then
-      return actors(actor.id).inbox.num_of_messages;
+      return count_messages(actors(actor.id).inbox);
     else
-      return actors(actor.id).outbox.num_of_messages;
+      return count_messages(actors(actor.id).outbox);
     end if;
   end function;
 
   procedure resize_mailbox (actor : actor_t; new_size : natural; mailbox_id : mailbox_id_t) is
   begin
-    if mailbox_id = inbox then
-      check(num_of_messages(actor, inbox) <= new_size, insufficient_size_error);
-      actors(actor.id).inbox.size         := new_size;
-    else
-      check(num_of_messages(actor, outbox) <= new_size, insufficient_size_error);
-      actors(actor.id).outbox.size         := new_size;
-    end if;
   end;
 
   impure function subscriber_inbox_is_full (
@@ -566,17 +575,18 @@ package body com_messenger_pkg is
     subscription_traffic_types : subscription_traffic_types_t) return boolean is
     variable result : boolean_vector(subscription_traffic_types'range) := (others => false);
     procedure has_full_inboxes (
-      variable subscribers : in  subscriber_item_ptr_t;
+      variable subscribers : in  subscriber_item_t;
       variable result      : out boolean) is
-      variable item : subscriber_item_ptr_t := subscribers;
+      variable n_subs : natural := count_subscribers(subscribers);
+      variable ptr    : natural := to_integer(subscribers.tail);
     begin
       result := false;
-      while item /= null loop
-        result := is_full(item.actor, inbox);
+      for i in 0 to n_subs-1 loop
+        result := is_full(subscribers.actors(ptr), inbox);
         exit when result;
-        has_full_inboxes(actors(item.actor.id).subscribers_i, result);
+        has_full_inboxes(actors(subscribers.actors(ptr).id).subscribers_i, result);
         exit when result;
-        item   := item.next_item;
+        ptr := (ptr + 1) mod 256;
       end loop;
     end;
   begin
@@ -600,21 +610,17 @@ package body com_messenger_pkg is
   begin
     case subscription_traffic_type is
       when published =>
-        return actors(actor.id).subscribers_p /= null;
+        return count_subscribers(actors(actor.id).subscribers_p) /= 0;
       when outbound =>
-        return actors(actor.id).subscribers_o /= null;
+        return count_subscribers(actors(actor.id).subscribers_o) /= 0;
       when inbound =>
-        return actors(actor.id).subscribers_i /= null;
+        return count_subscribers(actors(actor.id).subscribers_i) /= 0;
     end case;
   end;
 
   impure function mailbox_size (actor : actor_t; mailbox_id : mailbox_id_t) return natural is
   begin
-    if mailbox_id = inbox then
-      return actors(actor.id).inbox.size;
-    else
-      return actors(actor.id).outbox.size;
-    end if;
+    return 2**12-1;
   end function;
 
   -----------------------------------------------------------------------------
@@ -627,41 +633,42 @@ package body com_messenger_pkg is
     constant request_id : in  message_id_t;
     constant payload    : in  string;
     variable receipt    : out receipt_t) is
-    variable envelope : envelope_ptr_t;
-    variable mailbox  : mailbox_ptr_t;
+    variable head : natural;
   begin
     check(not is_full(receiver, mailbox_id), full_inbox_error);
 
     receipt.status              := ok;
     receipt.id                  := next_message_id;
-    envelope                    := new_envelope;
-    envelope.message.sender     := sender;
-    envelope.message.receiver   := receiver;
-    envelope.message.id         := next_message_id;
-    envelope.message.request_id := request_id;
-    write(envelope.message.payload, payload);
-    next_message_id             := next_message_id + 1;
 
-    mailbox                 := actors(receiver.id).inbox when mailbox_id = inbox else actors(receiver.id).outbox;
-    mailbox.num_of_messages := mailbox.num_of_messages + 1;
-    if mailbox.last_envelope /= null then
-      mailbox.last_envelope.next_envelope := envelope;
+    if mailbox_id = inbox then
+      head := to_integer(actors(receiver.id).inbox.head);
+      actors(receiver.id).inbox.messages(head).sender     := sender;
+      actors(receiver.id).inbox.messages(head).receiver   := receiver;
+      actors(receiver.id).inbox.messages(head).id         := next_message_id;
+      actors(receiver.id).inbox.messages(head).request_id := request_id;
+      actors(receiver.id).inbox.messages(head).payload    := payload;
+      actors(receiver.id).inbox.head := actors(receiver.id).inbox.head + 1;
     else
-      mailbox.first_envelope := envelope;
+      head := to_integer(actors(receiver.id).outbox.head);
+      actors(receiver.id).outbox.messages(head).sender     := sender;
+      actors(receiver.id).outbox.messages(head).receiver   := receiver;
+      actors(receiver.id).outbox.messages(head).id         := next_message_id;
+      actors(receiver.id).outbox.messages(head).request_id := request_id;
+      actors(receiver.id).outbox.messages(head).payload    := payload;
+      actors(receiver.id).outbox.head := actors(receiver.id).outbox.head + 1;
     end if;
-    mailbox.last_envelope := envelope;
   end;
 
   procedure publish (sender : actor_t; payload : string) is
     variable receipt         : receipt_t;
-    variable subscriber_item : subscriber_item_ptr_t;
+    variable n_subs : natural := count_subscribers(actors(sender.id).subscribers_p);
+    variable ptr    : natural := to_integer(actors(sender.id).subscribers_p.tail);
   begin
     check(not unknown_actor(sender), unknown_publisher_error);
 
-    subscriber_item := actors(sender.id).subscribers_p;
-    while subscriber_item /= null loop
-      send(sender, subscriber_item.actor, inbox, no_message_id, payload, receipt);
-      subscriber_item := subscriber_item.next_item;
+    for i in 0 to n_subs-1 loop
+      send(sender, actors(sender.id).subscribers_p.actors(ptr), inbox, no_message_id, payload, receipt);
+      ptr := (ptr + 1) mod 256;
     end loop;
   end;
 
@@ -704,9 +711,8 @@ package body com_messenger_pkg is
     msg        : msg_t;
     mailbox_id : mailbox_id_t;
     copy_msg : boolean) is
-    variable envelope : envelope_ptr_t;
     variable data     : msg_data_t := msg.data;
-    variable mailbox  : mailbox_ptr_t;
+    variable head : natural;
 
   begin
     if copy_msg then
@@ -720,37 +726,41 @@ package body com_messenger_pkg is
 --      trace(com_logger, "[" & to_string(msg) & "] => " & name(receiver) & " " & mailbox_id_t'image(mailbox_id));
 --    end if;
 
-    envelope                    := new_envelope;
-    envelope.message.id         := msg.id;
-    envelope.message.msg_type   := msg.msg_type;
-    envelope.message.sender     := msg.sender;
-    envelope.message.receiver   := msg.receiver;
-    envelope.message.request_id := msg.request_id;
-    write(envelope.message.payload, encode(data));
-
-    mailbox                 := actors(receiver.id).inbox when mailbox_id = inbox else actors(receiver.id).outbox;
-    mailbox.num_of_messages := mailbox.num_of_messages + 1;
-    if mailbox.last_envelope /= null then
-      mailbox.last_envelope.next_envelope := envelope;
+    if mailbox_id = inbox then
+      head := to_integer(actors(receiver.id).inbox.head);
+      actors(receiver.id).inbox.messages(head).id         := msg.id;
+      actors(receiver.id).inbox.messages(head).msg_type   := msg.msg_type;
+      actors(receiver.id).inbox.messages(head).sender     := msg.sender;
+      actors(receiver.id).inbox.messages(head).receiver   := msg.receiver;
+      actors(receiver.id).inbox.messages(head).request_id := msg.request_id;
+      actors(receiver.id).inbox.messages(head).payload    := encode(data);
+      actors(receiver.id).inbox.head := actors(receiver.id).inbox.head + 1;
     else
-      mailbox.first_envelope := envelope;
+      head := to_integer(actors(receiver.id).outbox.head);
+      actors(receiver.id).outbox.messages(head).id         := msg.id;
+      actors(receiver.id).outbox.messages(head).msg_type   := msg.msg_type;
+      actors(receiver.id).outbox.messages(head).sender     := msg.sender;
+      actors(receiver.id).outbox.messages(head).receiver   := msg.receiver;
+      actors(receiver.id).outbox.messages(head).request_id := msg.request_id;
+      actors(receiver.id).outbox.messages(head).payload    := encode(data);
+      actors(receiver.id).outbox.head := actors(receiver.id).outbox.head + 1;
     end if;
-    mailbox.last_envelope := envelope;
   end procedure;
 
   procedure put_subscriber_messages (
-    variable subscribers      : inout subscriber_item_ptr_t;
+    variable subscribers      : inout subscriber_item_t;
     variable msg              : inout msg_t;
     constant set_msg_receiver : in    boolean) is
-    variable subscriber_item : subscriber_item_ptr_t := subscribers;
+    variable n_subs : natural := count_subscribers(subscribers);
+    variable ptr    : natural := to_integer(subscribers.tail);
   begin
-    while subscriber_item /= null loop
+    for i in 0 to n_subs-1 loop
       if set_msg_receiver then
-        msg.receiver := subscriber_item.actor;
+        msg.receiver := subscribers.actors(ptr);
       end if;
-      put_message(subscriber_item.actor, msg, inbox, true);
-      internal_publish(subscriber_item.actor, msg, (0 => inbound));
-      subscriber_item := subscriber_item.next_item;
+      put_message(subscribers.actors(ptr), msg, inbox, true);
+      internal_publish(subscribers.actors(ptr), msg, (0 => inbound));
+      ptr := (ptr + 1) mod 256;
     end loop;
   end;
 
@@ -828,7 +838,7 @@ package body com_messenger_pkg is
   -----------------------------------------------------------------------------
   impure function has_messages (actor : actor_t) return boolean is
   begin
-    return actors(actor.id).inbox.first_envelope /= null;
+    return count_messages(actors(actor.id).inbox) /= 0;
   end function has_messages;
 
   impure function has_messages (actor_vec : actor_vec_t) return boolean is
@@ -841,37 +851,16 @@ package body com_messenger_pkg is
     return false;
   end function has_messages;
 
-  procedure get_envelope(
-    actor      : actor_t;
-    position   : natural;
-    mailbox_id : mailbox_id_t;
-    variable mailbox : inout mailbox_ptr_t;
-    variable envelope : inout envelope_ptr_t;
-    variable previous_envelope : inout envelope_ptr_t) is
-  begin
-    mailbox  := actors(actor.id).inbox when mailbox_id = inbox else actors(actor.id).outbox;
-    envelope := mailbox.first_envelope;
-    previous_envelope := null;
-
-    for i in 1 to position loop
-      exit when envelope = null;
-      previous_envelope := envelope;
-      envelope := envelope.next_envelope;
-    end loop;
-  end;
-
   impure function get_payload (
     actor      : actor_t;
     position   : natural      := 0;
     mailbox_id : mailbox_id_t := inbox) return string is
-    variable envelope, previous_envelope : envelope_ptr_t;
-    variable mailbox : mailbox_ptr_t;
+    variable idx : natural := to_integer(actors(actor.id).inbox.tail + position);
   begin
-    get_envelope(actor, position, mailbox_id, mailbox, envelope, previous_envelope);
-    if envelope /= null then
-      return envelope.message.payload.all;
-    else
+    if count_messages(actors(actor.id).inbox) <= position then
       return "";
+    else
+      return actors(actor.id).inbox.messages(idx).payload;
     end if;
   end;
 
@@ -879,14 +868,12 @@ package body com_messenger_pkg is
     actor      : actor_t;
     position   : natural      := 0;
     mailbox_id : mailbox_id_t := inbox) return actor_t is
-    variable envelope, previous_envelope : envelope_ptr_t;
-    variable mailbox : mailbox_ptr_t;
+    variable idx : natural := to_integer(actors(actor.id).inbox.tail + position);
   begin
-    get_envelope(actor, position, mailbox_id, mailbox, envelope, previous_envelope);
-    if envelope /= null then
-      return envelope.message.sender;
-    else
+    if count_messages(actors(actor.id).inbox) <= position then
       return null_actor;
+    else
+      return actors(actor.id).inbox.messages(idx).sender;
     end if;
   end;
 
@@ -894,14 +881,12 @@ package body com_messenger_pkg is
     actor      : actor_t;
     position   : natural      := 0;
     mailbox_id : mailbox_id_t := inbox) return actor_t is
-    variable envelope, previous_envelope : envelope_ptr_t;
-    variable mailbox : mailbox_ptr_t;
+    variable idx : natural := to_integer(actors(actor.id).inbox.tail + position);
   begin
-    get_envelope(actor, position, mailbox_id, mailbox, envelope, previous_envelope);
-    if envelope /= null then
-      return envelope.message.receiver;
-    else
+    if count_messages(actors(actor.id).inbox) <= position then
       return null_actor;
+    else
+      return actors(actor.id).inbox.messages(idx).receiver;
     end if;
   end;
 
@@ -909,14 +894,12 @@ package body com_messenger_pkg is
     actor      : actor_t;
     position   : natural      := 0;
     mailbox_id : mailbox_id_t := inbox) return message_id_t is
-    variable envelope, previous_envelope : envelope_ptr_t;
-    variable mailbox : mailbox_ptr_t;
+    variable idx : natural := to_integer(actors(actor.id).inbox.tail + position);
   begin
-    get_envelope(actor, position, mailbox_id, mailbox, envelope, previous_envelope);
-    if envelope /= null then
-      return envelope.message.id;
-    else
+    if count_messages(actors(actor.id).inbox) <= position then
       return no_message_id;
+    else
+      return actors(actor.id).inbox.messages(idx).id;
     end if;
   end;
 
@@ -924,14 +907,12 @@ package body com_messenger_pkg is
     actor      : actor_t;
     position   : natural      := 0;
     mailbox_id : mailbox_id_t := inbox) return message_id_t is
-    variable envelope, previous_envelope : envelope_ptr_t;
-    variable mailbox : mailbox_ptr_t;
+    variable idx : natural := to_integer(actors(actor.id).inbox.tail + position);
   begin
-    get_envelope(actor, position, mailbox_id, mailbox, envelope, previous_envelope);
-    if envelope /= null then
-      return envelope.message.request_id;
-    else
+    if count_messages(actors(actor.id).inbox) <= position then
       return no_message_id;
+    else
+      return actors(actor.id).inbox.messages(idx).request_id;
     end if;
   end;
 
@@ -939,21 +920,19 @@ package body com_messenger_pkg is
     actor      : actor_t;
     position   : natural      := 0;
     mailbox_id : mailbox_id_t := inbox) return msg_t is
-    variable envelope, previous_envelope : envelope_ptr_t;
-    variable mailbox : mailbox_ptr_t;
+    variable idx : natural := to_integer(actors(actor.id).inbox.tail + position);
     variable msg : msg_t;
   begin
-    get_envelope(actor, position, mailbox_id, mailbox, envelope, previous_envelope);
-    if envelope /= null then
-      msg.id := envelope.message.id;
-      msg.msg_type := envelope.message.msg_type;
-      msg.status := envelope.message.status;
-      msg.sender := envelope.message.sender;
-      msg.receiver := envelope.message.receiver;
-      msg.request_id := envelope.message.request_id;
-      msg.data := null_queue;
-    else
+    if count_messages(actors(actor.id).inbox) <= position then
       msg := null_msg;
+    else
+      msg.id          := actors(actor.id).inbox.messages(idx).id;
+      msg.msg_type    := actors(actor.id).inbox.messages(idx).msg_type;
+      msg.status      := actors(actor.id).inbox.messages(idx).status;
+      msg.sender      := actors(actor.id).inbox.messages(idx).sender;
+      msg.receiver    := actors(actor.id).inbox.messages(idx).receiver;
+      msg.request_id  := actors(actor.id).inbox.messages(idx).request_id;
+      msg.data        := null_queue;
     end if;
 
     return msg;
@@ -963,125 +942,116 @@ package body com_messenger_pkg is
     actor      : actor_t;
     position   : natural      := 0;
     mailbox_id : mailbox_id_t := inbox) is
-    variable envelope, previous_envelope : envelope_ptr_t;
-    variable mailbox : mailbox_ptr_t;
-    variable msg : msg_t;
+    variable llist  : message_array_t(0 to 2**12-1);
+    variable lptr   : natural := 0;
+    variable n_msgs : natural := count_messages(actors(actor.id).inbox);
+    variable ptr    : natural := to_integer(actors(actor.id).inbox.tail);
   begin
-    get_envelope(actor, position, mailbox_id, mailbox, envelope, previous_envelope);
+    if n_msgs <= position then
+      return;
+    end if;
 
-    if envelope /= null then
---      if is_visible(com_logger, trace) then
---        msg.id := envelope.message.id;
---        msg.msg_type := envelope.message.msg_type;
---        msg.sender := envelope.message.sender;
---        msg.receiver := envelope.message.receiver;
---        msg.request_id := envelope.message.request_id;
---        trace(com_logger, name(actor) & " " & mailbox_id_t'image(mailbox_id) & " => [" & to_string(msg) & "]");
---      end if;
-
-      deallocate(envelope.message.payload);
-
-      if previous_envelope /= null then
-        previous_envelope.next_envelope := envelope.next_envelope;
-      else
-        mailbox.first_envelope := envelope.next_envelope;
-      end if;
-
-      if envelope.next_envelope = null then
-        mailbox.last_envelope := previous_envelope;
-      end if;
-
-      deallocate_envelope(envelope);
-      mailbox.num_of_messages := mailbox.num_of_messages - 1;
+    if position = 0 then
+      -- Simpler case - just drop tail
+      actors(actor.id).inbox.tail := actors(actor.id).inbox.tail + 1;
+    else
+      for i in 0 to n_msgs-1 loop
+        if i /= position then
+          llist(lptr) := actors(actor.id).inbox.messages(ptr);
+        end if;
+        lptr := lptr + 1;
+        ptr := (ptr + 1) mod 2**12;
+      end loop;
+      -- Flush list
+      actors(actor.id).inbox.tail := to_unsigned(ptr, 12);
+      for i in 0 to n_msgs-2 loop
+        actors(actor.id).inbox.messages(ptr) := llist(i);
+        ptr := (ptr + 1) mod 2**12;
+      end loop;
+      actors(actor.id).inbox.head := to_unsigned(ptr, 12); 
     end if;
   end;
 
-  impure function has_reply_stash_message (
-    actor      : actor_t;
-    request_id : message_id_t := no_message_id)
-    return boolean is
-  begin
-    if request_id = no_message_id then
-      return actors(actor.id).reply_stash /= null;
-    elsif actors(actor.id).reply_stash /= null then
-      return actors(actor.id).reply_stash.message.request_id = request_id;
-    else
-      return false;
-    end if;
-  end function has_reply_stash_message;
-
-  impure function get_reply_stash_message_payload (actor : actor_t) return string is
-    variable envelope : envelope_ptr_t := actors(actor.id).reply_stash;
-  begin
-    if envelope /= null then
-      return envelope.message.payload.all;
-    else
-      return "";
-    end if;
-  end;
-
-  impure function get_reply_stash_message_sender (actor : actor_t) return actor_t is
-    variable envelope : envelope_ptr_t := actors(actor.id).reply_stash;
-  begin
-    if envelope /= null then
-      return envelope.message.sender;
-    else
-      return null_actor;
-    end if;
-  end;
-
-  impure function get_reply_stash_message_receiver (actor     : actor_t) return actor_t is
-    variable envelope : envelope_ptr_t := actors(actor.id).reply_stash;
-  begin
-    if envelope /= null then
-      return envelope.message.receiver;
-    else
-      return null_actor;
-    end if;
-  end;
-
-  impure function get_reply_stash_message_id (actor : actor_t) return message_id_t is
-    variable envelope : envelope_ptr_t := actors(actor.id).reply_stash;
-  begin
-    if envelope /= null then
-      return envelope.message.id;
-    else
-      return no_message_id;
-    end if;
-  end;
-
-  impure function get_reply_stash_message_request_id (actor : actor_t) return message_id_t is
-    variable envelope : envelope_ptr_t := actors(actor.id).reply_stash;
-  begin
-    if envelope /= null then
-      return envelope.message.request_id;
-    else
-      return no_message_id;
-    end if;
-  end;
+--  impure function has_reply_stash_message (
+--    actor      : actor_t;
+--    request_id : message_id_t := no_message_id)
+--    return boolean is
+--  begin
+--    if request_id = no_message_id then
+--      return actors(actor.id).reply_stash /= null;
+--    elsif actors(actor.id).reply_stash /= null then
+--      return actors(actor.id).reply_stash.message.request_id = request_id;
+--    else
+--      return false;
+--    end if;
+--  end function has_reply_stash_message;
+--
+--  impure function get_reply_stash_message_payload (actor : actor_t) return string is
+--    variable envelope : envelope_ptr_t := actors(actor.id).reply_stash;
+--  begin
+--    if envelope /= null then
+--      return envelope.message.payload.all;
+--    else
+--      return "";
+--    end if;
+--  end;
+--
+--  impure function get_reply_stash_message_sender (actor : actor_t) return actor_t is
+--    variable envelope : envelope_ptr_t := actors(actor.id).reply_stash;
+--  begin
+--    if envelope /= null then
+--      return envelope.message.sender;
+--    else
+--      return null_actor;
+--    end if;
+--  end;
+--
+--  impure function get_reply_stash_message_receiver (actor     : actor_t) return actor_t is
+--    variable envelope : envelope_ptr_t := actors(actor.id).reply_stash;
+--  begin
+--    if envelope /= null then
+--      return envelope.message.receiver;
+--    else
+--      return null_actor;
+--    end if;
+--  end;
+--
+--  impure function get_reply_stash_message_id (actor : actor_t) return message_id_t is
+--    variable envelope : envelope_ptr_t := actors(actor.id).reply_stash;
+--  begin
+--    if envelope /= null then
+--      return envelope.message.id;
+--    else
+--      return no_message_id;
+--    end if;
+--  end;
+--
+--  impure function get_reply_stash_message_request_id (actor : actor_t) return message_id_t is
+--    variable envelope : envelope_ptr_t := actors(actor.id).reply_stash;
+--  begin
+--    if envelope /= null then
+--      return envelope.message.request_id;
+--    else
+--      return no_message_id;
+--    end if;
+--  end;
 
   procedure find_reply_message (
-    actor      : actor_t;
+    mailbox    : mailbox_t;
     request_id : message_id_t;
-    mailbox_id : mailbox_id_t;
-    variable mailbox : inout mailbox_ptr_t;
-    variable envelope : inout envelope_ptr_t;
-    variable previous_envelope : out envelope_ptr_t;
-    variable position : out natural) is
+    variable position : out integer) is
+    variable n_msgs : natural := count_messages(mailbox);
+    variable ptr    : natural := to_integer(mailbox.tail);
   begin
-    mailbox  := actors(actor.id).inbox when mailbox_id = inbox else actors(actor.id).outbox;
-    envelope := mailbox.first_envelope;
-    previous_envelope := null;
-    position := 0;
-
-    while envelope /= null loop
-      if envelope.message.request_id = request_id then
+    for i in 0 to n_msgs-1 loop
+      if mailbox.messages(ptr).request_id = request_id then
+        position := i;
         return;
       end if;
-      previous_envelope := envelope;
-      envelope := envelope.next_envelope;
-      position := position + 1;
+      ptr := (ptr + 1) mod 2**12;
     end loop;
+
+    position := -1;
   end;
 
   impure function find_reply_message (
@@ -1089,64 +1059,61 @@ package body com_messenger_pkg is
     request_id : message_id_t;
     mailbox_id : mailbox_id_t := inbox)
     return integer is
-    variable envelope          : envelope_ptr_t;
-    variable previous_envelope : envelope_ptr_t := null;
-    variable mailbox           : mailbox_ptr_t;
-    variable position : natural;
+    variable position : integer;
   begin
-    find_reply_message(actor, request_id, mailbox_id, mailbox, envelope, previous_envelope, position);
-
-    if envelope /= null then
-      return position;
+    if mailbox_id = inbox then
+      find_reply_message(actors(actor.id).inbox, request_id, position);
     else
-      return -1;
+      find_reply_message(actors(actor.id).outbox, request_id, position);
     end if;
+
+    return position;
   end;
 
-  impure function find_and_stash_reply_message (
-    actor      : actor_t;
-    request_id : message_id_t;
-    mailbox_id : mailbox_id_t := inbox)
-    return boolean is
-    variable envelope          : envelope_ptr_t;
-    variable previous_envelope : envelope_ptr_t := null;
-    variable mailbox           : mailbox_ptr_t;
-    variable position : natural;
-  begin
-    find_reply_message(actor, request_id, mailbox_id, mailbox, envelope, previous_envelope, position);
-
-    if envelope /= null then
-      actors(actor.id).reply_stash := envelope;
-
-      if previous_envelope /= null then
-        previous_envelope.next_envelope := envelope.next_envelope;
-      else
-        mailbox.first_envelope := envelope.next_envelope;
-      end if;
-
-      if mailbox.first_envelope = null then
-        mailbox.last_envelope := null;
-      end if;
-
-      mailbox.num_of_messages := mailbox.num_of_messages - 1;
-
-      return true;
-    end if;
-
-    return false;
-  end function find_and_stash_reply_message;
-
-  procedure clear_reply_stash (actor : actor_t) is
-  begin
-    deallocate(actors(actor.id).reply_stash.message.payload);
-    deallocate(actors(actor.id).reply_stash);
-  end procedure clear_reply_stash;
+--  impure function find_and_stash_reply_message (
+--    actor      : actor_t;
+--    request_id : message_id_t;
+--    mailbox_id : mailbox_id_t := inbox)
+--    return boolean is
+--    variable envelope          : envelope_ptr_t;
+--    variable previous_envelope : envelope_ptr_t := null;
+--    variable mailbox           : mailbox_ptr_t;
+--    variable position : natural;
+--  begin
+--    find_reply_message(actor, request_id, mailbox_id, mailbox, envelope, previous_envelope, position);
+--
+--    if envelope /= null then
+--      actors(actor.id).reply_stash := envelope;
+--
+--      if previous_envelope /= null then
+--        previous_envelope.next_envelope := envelope.next_envelope;
+--      else
+--        mailbox.first_envelope := envelope.next_envelope;
+--      end if;
+--
+--      if mailbox.first_envelope = null then
+--        mailbox.last_envelope := null;
+--      end if;
+--
+--      mailbox.num_of_messages := mailbox.num_of_messages - 1;
+--
+--      return true;
+--    end if;
+--
+--    return false;
+--  end function find_and_stash_reply_message;
+--
+--  procedure clear_reply_stash (actor : actor_t) is
+--  begin
+--    deallocate(actors(actor.id).reply_stash.message.payload);
+--    deallocate(actors(actor.id).reply_stash);
+--  end procedure clear_reply_stash;
 
   procedure subscribe (
     subscriber   : actor_t;
     publisher    : actor_t;
     traffic_type : subscription_traffic_type_t := published) is
-    variable new_subscriber : subscriber_item_ptr_t;
+--    variable new_subscriber : subscriber_item_ptr_t;
   begin
     check(not unknown_actor(subscriber), unknown_subscriber_error);
     check(not unknown_actor(publisher), unknown_publisher_error);
@@ -1157,16 +1124,16 @@ package body com_messenger_pkg is
       check(not is_subscriber(subscriber, publisher, published), already_a_subscriber_error);
     end if;
 
-    if traffic_type = published then
-      new_subscriber                              := new subscriber_item_t'(subscriber, actors(publisher.id).subscribers_p);
-      actors(publisher.id).subscribers_p          := new_subscriber;
-    elsif traffic_type = outbound then
-      new_subscriber                             := new subscriber_item_t'(subscriber, actors(publisher.id).subscribers_o);
-      actors(publisher.id).subscribers_o         := new_subscriber;
-    else
-      new_subscriber                            := new subscriber_item_t'(subscriber, actors(publisher.id).subscribers_i);
-      actors(publisher.id).subscribers_i        := new_subscriber;
-    end if;
+--    if traffic_type = published then
+--      new_subscriber                              := new subscriber_item_t'(subscriber, actors(publisher.id).subscribers_p);
+--      actors(publisher.id).subscribers_p          := new_subscriber;
+--    elsif traffic_type = outbound then
+--      new_subscriber                             := new subscriber_item_t'(subscriber, actors(publisher.id).subscribers_o);
+--      actors(publisher.id).subscribers_o         := new_subscriber;
+--    else
+--      new_subscriber                            := new subscriber_item_t'(subscriber, actors(publisher.id).subscribers_i);
+--      actors(publisher.id).subscribers_i        := new_subscriber;
+--    end if;
   end procedure subscribe;
 
   procedure unsubscribe (
@@ -1185,106 +1152,106 @@ package body com_messenger_pkg is
   -- Debugging
   ---------------------------------------------------------------------------
   impure function get_subscriptions(subscriber : actor_t) return subscription_vec_t is
-    impure function num_of_subscriptions return natural is
-      variable n_subscriptions : natural := 0;
-      variable item : subscriber_item_ptr_t;
-    begin
-      for a in actors'range loop
-        for t in subscription_traffic_type_t'left to subscription_traffic_type_t'right loop
-          case t is
-            when published =>
-              item := actors(a).subscribers_p;
-            when outbound =>
-              item := actors(a).subscribers_o;
-            when inbound =>
-              item := actors(a).subscribers_i;
-          end case;
-          while item /= null loop
-            if item.actor = subscriber then
-              n_subscriptions := n_subscriptions + 1;
-            end if;
-            item := item.next_item;
-          end loop;
-        end loop;
-      end loop;
-
-      return n_subscriptions;
-    end;
-
-    constant n_subscriptions : natural := num_of_subscriptions;
-    variable subscriptions : subscription_vec_t(0 to n_subscriptions - 1);
-    variable item : subscriber_item_ptr_t;
-    variable idx : natural := 0;
+--    impure function num_of_subscriptions return natural is
+--      variable n_subscriptions : natural := 0;
+--      variable item : subscriber_item_ptr_t;
+--    begin
+--      for a in actors'range loop
+--        for t in subscription_traffic_type_t'left to subscription_traffic_type_t'right loop
+--          case t is
+--            when published =>
+--              item := actors(a).subscribers_p;
+--            when outbound =>
+--              item := actors(a).subscribers_o;
+--            when inbound =>
+--              item := actors(a).subscribers_i;
+--          end case;
+--          while item /= null loop
+--            if item.actor = subscriber then
+--              n_subscriptions := n_subscriptions + 1;
+--            end if;
+--            item := item.next_item;
+--          end loop;
+--        end loop;
+--      end loop;
+--
+--      return n_subscriptions;
+--    end;
+--
+--    constant n_subscriptions : natural := num_of_subscriptions;
+    variable subscriptions : subscription_vec_t(0 to 0);
+--    variable item : subscriber_item_ptr_t;
+--    variable idx : natural := 0;
   begin
-    for a in actors'range loop
-      for t in subscription_traffic_type_t'left to subscription_traffic_type_t'right loop
-        case t is
-          when published =>
-            item := actors(a).subscribers_p;
-          when outbound =>
-            item := actors(a).subscribers_o;
-          when inbound =>
-            item := actors(a).subscribers_i;
-        end case;
-        while item /= null loop
-          if item.actor = subscriber then
-            subscriptions(idx).subscriber := subscriber;
-            subscriptions(idx).publisher := actors(a).actor;
-            subscriptions(idx).traffic_type := t;
-            idx := idx + 1;
-          end if;
-          item := item.next_item;
-        end loop;
-      end loop;
-    end loop;
+--    for a in actors'range loop
+--      for t in subscription_traffic_type_t'left to subscription_traffic_type_t'right loop
+--        case t is
+--          when published =>
+--            item := actors(a).subscribers_p;
+--          when outbound =>
+--            item := actors(a).subscribers_o;
+--          when inbound =>
+--            item := actors(a).subscribers_i;
+--        end case;
+--        while item /= null loop
+--          if item.actor = subscriber then
+--            subscriptions(idx).subscriber := subscriber;
+--            subscriptions(idx).publisher := actors(a).actor;
+--            subscriptions(idx).traffic_type := t;
+--            idx := idx + 1;
+--          end if;
+--          item := item.next_item;
+--        end loop;
+--      end loop;
+--    end loop;
 
     return subscriptions;
   end;
 
   impure function get_subscribers(publisher : actor_t) return subscription_vec_t is
-    impure function num_of_subscriptions return natural is
-      variable n_subscriptions : natural := 0;
-      variable item : subscriber_item_ptr_t;
-    begin
-      for t in subscription_traffic_type_t'left to subscription_traffic_type_t'right loop
-        case t is
-          when published =>
-            item := actors(publisher.id).subscribers_p;
-          when outbound =>
-            item := actors(publisher.id).subscribers_o;
-          when inbound =>
-            item := actors(publisher.id).subscribers_i;
-        end case;
-        while item /= null loop
-          n_subscriptions := n_subscriptions + 1;
-          item := item.next_item;
-        end loop;
-      end loop;
-
-      return n_subscriptions;
-    end;
-    constant n_subscriptions : natural := num_of_subscriptions;
-    variable subscriptions : subscription_vec_t(0 to n_subscriptions - 1);
-    variable item : subscriber_item_ptr_t;
-    variable idx : natural := 0;
+--    impure function num_of_subscriptions return natural is
+--      variable n_subscriptions : natural := 0;
+--      variable item : subscriber_item_ptr_t;
+--    begin
+--      for t in subscription_traffic_type_t'left to subscription_traffic_type_t'right loop
+--        case t is
+--          when published =>
+--            item := actors(publisher.id).subscribers_p;
+--          when outbound =>
+--            item := actors(publisher.id).subscribers_o;
+--          when inbound =>
+--            item := actors(publisher.id).subscribers_i;
+--        end case;
+--        while item /= null loop
+--          n_subscriptions := n_subscriptions + 1;
+--          item := item.next_item;
+--        end loop;
+--      end loop;
+--
+--      return n_subscriptions;
+--    end;
+--    constant n_subscriptions : natural := num_of_subscriptions;
+    variable subscriptions : subscription_vec_t(0 to 0);
+--    variable item : subscriber_item_ptr_t;
+--    variable idx : natural := 0;
   begin
-    for t in subscription_traffic_type_t'left to subscription_traffic_type_t'right loop
-      case t is
-        when published =>
-          item := actors(publisher.id).subscribers_p;
-        when outbound =>
-          item := actors(publisher.id).subscribers_o;
-        when inbound =>
-          item := actors(publisher.id).subscribers_i;
-      end case;
-      while item /= null loop
-        subscriptions(idx).subscriber := item.actor;
-        subscriptions(idx).publisher := publisher;
-        subscriptions(idx).traffic_type := t;
-        idx := idx + 1;
-        item := item.next_item;
-      end loop;
-    end loop;
+--    for t in subscription_traffic_type_t'left to subscription_traffic_type_t'right loop
+--      case t is
+--        when published =>
+--          item := actors(publisher.id).subscribers_p;
+--        when outbound =>
+--          item := actors(publisher.id).subscribers_o;
+--        when inbound =>
+--          item := actors(publisher.id).subscribers_i;
+--      end case;
+--      while item /= null loop
+--        subscriptions(idx).subscriber := item.actor;
+--        subscriptions(idx).publisher := publisher;
+--        subscriptions(idx).traffic_type := t;
+--        idx := idx + 1;
+--        item := item.next_item;
+--      end loop;
+--    end loop;
 
     return subscriptions;
   end;

@@ -86,7 +86,7 @@ package com_types_pkg is
     sender : actor_t;
     receiver : actor_t;
     request_id : message_id_t;
-    payload : line;
+    payload : string(1 to 8);
   end record message_t;
   type message_ptr_t is access message_t;
 
