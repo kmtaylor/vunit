@@ -19,8 +19,8 @@ package body string_ptr_pkg is
     idx   : natural;
     ptr   : natural;
     eptr  : natural;
-    idxs  : storage_vector_t(0 to 2**16);
-    ptrs  : string_access_vector_t(0 to 2**16);
+    idxs  : storage_vector_t(0 to 2**16-1);
+    ptrs  : string_access_vector_t(0 to 2**16-1);
     eptrs : evava_t;
   end record;
 
