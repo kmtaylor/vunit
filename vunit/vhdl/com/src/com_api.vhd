@@ -14,7 +14,7 @@ use work.com_types_pkg.all;
 use work.queue_pkg.all;
 use work.integer_vector_ptr_pkg.all;
 use work.string_ptr_pkg.all;
---
+
 package com_pkg is
   -- Global predefined network. See network_t description in com_types.vhd for
   -- more information.

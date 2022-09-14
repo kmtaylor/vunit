@@ -97,10 +97,10 @@ package body com_pkg is
     subscription_traffic_types : subscription_traffic_types_t;
     timeout                    : time) is
   begin
---    if subscriber_inbox_is_full(publisher, subscription_traffic_types) then
---      wait on net until not subscriber_inbox_is_full(publisher, subscription_traffic_types) for timeout;
---      check(not subscriber_inbox_is_full(publisher, subscription_traffic_types), full_inbox_error);
---    end if;
+    if subscriber_inbox_is_full(publisher, subscription_traffic_types) then
+      wait on net until not subscriber_inbox_is_full(publisher, subscription_traffic_types) for timeout;
+      check(not subscriber_inbox_is_full(publisher, subscription_traffic_types), full_inbox_error);
+    end if;
   end procedure wait_on_subscribers;
 
   procedure send (
@@ -115,7 +115,6 @@ package body com_pkg is
       return;
     end if;
 
-    report("attempting to send: actor.id: " & integer'image(receiver.id));
     if not check(not unknown_actor(receiver), unknown_receiver_error) then
       return;
     end if;
@@ -128,17 +127,17 @@ package body com_pkg is
 
     send(receiver, mailbox_id, msg);
 
---    if msg.sender /= null_actor then
---      if has_subscribers(msg.sender, outbound) then
---        wait_on_subscribers(msg.sender, (0             => outbound), timeout - (now - t_start));
---        internal_publish(msg.sender, msg, (0 => outbound));
---      end if;
---    end if;
---
---    if (mailbox_id = inbox) and has_subscribers(receiver, inbound) then
---      wait_on_subscribers(receiver, (0             => inbound), timeout - (now - t_start));
---      internal_publish(receiver, msg, (0 => inbound));
---    end if;
+    if msg.sender /= null_actor then
+      if has_subscribers(msg.sender, outbound) then
+        wait_on_subscribers(msg.sender, (0             => outbound), timeout - (now - t_start));
+        internal_publish(msg.sender, msg, (0 => outbound));
+      end if;
+    end if;
+
+    if (mailbox_id = inbox) and has_subscribers(receiver, inbound) then
+      wait_on_subscribers(receiver, (0             => inbound), timeout - (now - t_start));
+      internal_publish(receiver, msg, (0 => inbound));
+    end if;
 
     notify(net);
     msg.data := null_queue;
@@ -195,7 +194,7 @@ package body com_pkg is
     variable receiver : actor_t;
   begin
     delete(msg);
---    wait_for_message(net, receivers, status, timeout);
+    wait_for_message(net, receivers, status, timeout);
     if not check(no_error_status(status), status) then
       return;
     end if;
@@ -250,10 +249,10 @@ package body com_pkg is
     variable msg     : inout msg_t;
     constant timeout : in    time := max_timeout) is
   begin
---    wait_on_subscribers(sender, (published, outbound), timeout);
---    publish(sender, msg, (published, outbound));
---    notify(net);
---    recycle(queue_pool, msg.data);
+    wait_on_subscribers(sender, (published, outbound), timeout);
+    publish(sender, msg, (published, outbound));
+    notify(net);
+    recycle(queue_pool, msg.data);
   end;
 
   impure function peek_message(

@@ -8,6 +8,7 @@
 -- Copyright (c) 2014-2022, Lars Asplund lars.anders.asplund@gmail.com
 
 library ieee;
+use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
 use work.com_types_pkg.all;
@@ -163,6 +164,9 @@ end package com_messenger_pkg;
 
 package body com_messenger_pkg is
 
+  constant null_message : message_t := (no_message_id, null_msg_type, ok, null_actor,
+                                        null_actor, no_message_id, (others => nul));
+
   type message_array_t is array (natural range <>) of message_t;
 
   type mailbox_t is record
@@ -170,6 +174,8 @@ package body com_messenger_pkg is
     head      : unsigned(11 downto 0);
     tail      : unsigned(11 downto 0);
   end record mailbox_t;
+
+  constant null_mailbox : mailbox_t := ((others => null_message), (others => '0'), (others => '0'));
 
   function count_messages(mbox : mailbox_t)
     return natural is
@@ -182,6 +188,8 @@ package body com_messenger_pkg is
     head      : unsigned(7 downto 0);
     tail      : unsigned(7 downto 0);
   end record subscriber_item_t;
+
+  constant null_subscribers : subscriber_item_t := ((others => null_actor), (others => '0'), (others => '0'));
 
   function count_subscribers(subs : subscriber_item_t)
     return natural is
@@ -203,19 +211,16 @@ package body com_messenger_pkg is
 
   type actor_item_array_t is array (natural range <>) of actor_item_t;
 
-  constant null_message : message_t := (no_message_id, null_msg_type, ok, null_actor,
-                                        null_actor, no_message_id, (others => nul));
-
   shared variable null_actor_item : actor_item_t := (
     actor             => null_actor,
     name              => null,
     deferred_creation => false,
-    inbox             => ((others => null_message), (others => '0'), (others => '0')),
-    outbox            => ((others => null_message), (others => '0'), (others => '0')),
+    inbox             => null_mailbox,
+    outbox            => null_mailbox,
 --        reply_stash       => null,
-    subscribers_p     => ((others => null_actor), (others => '0'), (others => '0')),
-    subscribers_o     => ((others => null_actor), (others => '0'), (others => '0')),
-    subscribers_i     => ((others => null_actor), (others => '0'), (others => '0'))
+    subscribers_p     => null_subscribers,
+    subscribers_o     => null_subscribers,
+    subscribers_i     => null_subscribers
   );
 
   shared variable next_message_id      : message_id_t := no_message_id + 1;
@@ -250,11 +255,7 @@ package body com_messenger_pkg is
     return actor_t is
   begin
     actors(num_actors) := ((id => num_actors), new string'(name), deferred_creation,
-                           ((others => null_message), (others => '0'), (others => '0')),
-                           ((others => null_message), (others => '0'), (others => '0')),
-                           ((others => null_actor), (others => '0'), (others => '0')),
-                           ((others => null_actor), (others => '0'), (others => '0')),
-                           ((others => null_actor), (others => '0'), (others => '0')));
+                           null_mailbox, null_mailbox, null_subscribers, null_subscribers, null_subscribers);
 
     num_actors := num_actors + 1;
     return actors(num_actors - 1).actor;
@@ -350,10 +351,10 @@ package body com_messenger_pkg is
     for i in 0 to n_subs-1 loop
       if subscribers.actors(ptr) /= subscriber then
         llist(lptr) := subscribers.actors(ptr);
+        lptr := lptr + 1;
       else
         found := true;
       end if;
-      lptr := lptr + 1;
       ptr := (ptr + 1) mod 256;
     end loop;
     if not found then
@@ -1033,11 +1034,16 @@ package body com_messenger_pkg is
 --    deallocate(actors(actor.id).reply_stash);
 --  end procedure clear_reply_stash;
 
+  procedure add_subscriber (subscribers : inout subscriber_item_t; subscriber : actor_t) is
+  begin
+    subscribers.actors(to_integer(subscribers.head)) := subscriber;
+    subscribers.head := subscribers.head + 1;
+  end;
+
   procedure subscribe (
     subscriber   : actor_t;
     publisher    : actor_t;
     traffic_type : subscription_traffic_type_t := published) is
---    variable new_subscriber : subscriber_item_ptr_t;
   begin
     check(not unknown_actor(subscriber), unknown_subscriber_error);
     check(not unknown_actor(publisher), unknown_publisher_error);
@@ -1048,16 +1054,14 @@ package body com_messenger_pkg is
       check(not is_subscriber(subscriber, publisher, published), already_a_subscriber_error);
     end if;
 
---    if traffic_type = published then
---      new_subscriber                              := new subscriber_item_t'(subscriber, actors(publisher.id).subscribers_p);
---      actors(publisher.id).subscribers_p          := new_subscriber;
---    elsif traffic_type = outbound then
---      new_subscriber                             := new subscriber_item_t'(subscriber, actors(publisher.id).subscribers_o);
---      actors(publisher.id).subscribers_o         := new_subscriber;
---    else
---      new_subscriber                            := new subscriber_item_t'(subscriber, actors(publisher.id).subscribers_i);
---      actors(publisher.id).subscribers_i        := new_subscriber;
---    end if;
+    case traffic_type is
+      when published =>
+        add_subscriber(actors(publisher.id).subscribers_p, subscriber);
+      when outbound =>
+        add_subscriber(actors(publisher.id).subscribers_o, subscriber);
+      when inbound =>
+        add_subscriber(actors(publisher.id).subscribers_i, subscriber);
+    end case;
   end procedure subscribe;
 
   procedure unsubscribe (
@@ -1076,106 +1080,145 @@ package body com_messenger_pkg is
   -- Debugging
   ---------------------------------------------------------------------------
   impure function get_subscriptions(subscriber : actor_t) return subscription_vec_t is
---    impure function num_of_subscriptions return natural is
---      variable n_subscriptions : natural := 0;
---      variable item : subscriber_item_ptr_t;
---    begin
---      for a in 1 to num_actors-1 loop
---        for t in subscription_traffic_type_t'left to subscription_traffic_type_t'right loop
---          case t is
---            when published =>
---              item := actors(a).subscribers_p;
---            when outbound =>
---              item := actors(a).subscribers_o;
---            when inbound =>
---              item := actors(a).subscribers_i;
---          end case;
---          while item /= null loop
---            if item.actor = subscriber then
---              n_subscriptions := n_subscriptions + 1;
---            end if;
---            item := item.next_item;
---          end loop;
---        end loop;
---      end loop;
---
---      return n_subscriptions;
---    end;
---
---    constant n_subscriptions : natural := num_of_subscriptions;
-    variable subscriptions : subscription_vec_t(0 to 0);
---    variable item : subscriber_item_ptr_t;
---    variable idx : natural := 0;
+    impure function num_of_subscriptions return natural is
+      variable n_subscriptions  : natural := 0;
+      variable ptr              : natural;
+    begin
+      for a in 1 to num_actors-1 loop
+        for t in subscription_traffic_type_t'left to subscription_traffic_type_t'right loop
+          case t is
+            when published =>
+              ptr := to_integer(actors(a).subscribers_p.tail);
+              for i in 0 to count_subscribers(actors(a).subscribers_p)-1 loop
+                if actors(a).subscribers_p.actors(ptr) = subscriber then
+                  n_subscriptions := n_subscriptions + 1;
+                end if;
+                ptr := (ptr + 1) mod 256;
+              end loop;
+            when outbound =>
+              ptr := to_integer(actors(a).subscribers_o.tail);
+              for i in 0 to count_subscribers(actors(a).subscribers_o)-1 loop
+                if actors(a).subscribers_o.actors(ptr) = subscriber then
+                  n_subscriptions := n_subscriptions + 1;
+                end if;
+                ptr := (ptr + 1) mod 256;
+              end loop;
+            when inbound =>
+              ptr := to_integer(actors(a).subscribers_i.tail);
+              for i in 0 to count_subscribers(actors(a).subscribers_i)-1 loop
+                if actors(a).subscribers_i.actors(ptr) = subscriber then
+                  n_subscriptions := n_subscriptions + 1;
+                end if;
+                ptr := (ptr + 1) mod 256;
+              end loop;
+          end case;
+        end loop;
+      end loop;
+
+      return n_subscriptions;
+    end;
+
+    constant n_subscriptions : natural := num_of_subscriptions;
+    variable subscriptions : subscription_vec_t(0 to n_subscriptions-1);
+    variable idx : natural := 0;
+    variable ptr : natural;
   begin
---    for a in 1 to num_actors-1 loop
---      for t in subscription_traffic_type_t'left to subscription_traffic_type_t'right loop
---        case t is
---          when published =>
---            item := actors(a).subscribers_p;
---          when outbound =>
---            item := actors(a).subscribers_o;
---          when inbound =>
---            item := actors(a).subscribers_i;
---        end case;
---        while item /= null loop
---          if item.actor = subscriber then
---            subscriptions(idx).subscriber := subscriber;
---            subscriptions(idx).publisher := actors(a).actor;
---            subscriptions(idx).traffic_type := t;
---            idx := idx + 1;
---          end if;
---          item := item.next_item;
---        end loop;
---      end loop;
---    end loop;
+    for a in 1 to num_actors-1 loop
+      for t in subscription_traffic_type_t'left to subscription_traffic_type_t'right loop
+        case t is
+          when published =>
+            ptr := to_integer(actors(a).subscribers_p.tail);
+            for i in 0 to count_subscribers(actors(a).subscribers_p)-1 loop
+              if actors(a).subscribers_p.actors(ptr) = subscriber then
+                subscriptions(idx).subscriber := subscriber;
+                subscriptions(idx).publisher := actors(a).actor;
+                subscriptions(idx).traffic_type := t;
+                idx := idx + 1;
+              end if;
+              ptr := (ptr + 1) mod 256;
+            end loop;
+          when outbound =>
+            ptr := to_integer(actors(a).subscribers_o.tail);
+            for i in 0 to count_subscribers(actors(a).subscribers_o)-1 loop
+              if actors(a).subscribers_o.actors(ptr) = subscriber then
+                subscriptions(idx).subscriber := subscriber;
+                subscriptions(idx).publisher := actors(a).actor;
+                subscriptions(idx).traffic_type := t;
+                idx := idx + 1;
+              end if;
+              ptr := (ptr + 1) mod 256;
+            end loop;
+          when inbound =>
+            ptr := to_integer(actors(a).subscribers_i.tail);
+            for i in 0 to count_subscribers(actors(a).subscribers_i)-1 loop
+              if actors(a).subscribers_i.actors(ptr) = subscriber then
+                subscriptions(idx).subscriber := subscriber;
+                subscriptions(idx).publisher := actors(a).actor;
+                subscriptions(idx).traffic_type := t;
+                idx := idx + 1;
+              end if;
+              ptr := (ptr + 1) mod 256;
+            end loop;
+        end case;
+      end loop;
+    end loop;
 
     return subscriptions;
   end;
 
   impure function get_subscribers(publisher : actor_t) return subscription_vec_t is
---    impure function num_of_subscriptions return natural is
---      variable n_subscriptions : natural := 0;
---      variable item : subscriber_item_ptr_t;
---    begin
---      for t in subscription_traffic_type_t'left to subscription_traffic_type_t'right loop
---        case t is
---          when published =>
---            item := actors(publisher.id).subscribers_p;
---          when outbound =>
---            item := actors(publisher.id).subscribers_o;
---          when inbound =>
---            item := actors(publisher.id).subscribers_i;
---        end case;
---        while item /= null loop
---          n_subscriptions := n_subscriptions + 1;
---          item := item.next_item;
---        end loop;
---      end loop;
---
---      return n_subscriptions;
---    end;
---    constant n_subscriptions : natural := num_of_subscriptions;
+    impure function num_of_subscriptions return natural is
+      variable n_subscriptions : natural := 0;
+    begin
+      for t in subscription_traffic_type_t'left to subscription_traffic_type_t'right loop
+        case t is
+          when published =>
+            n_subscriptions := n_subscriptions + count_subscribers(actors(publisher.id).subscribers_o);
+          when outbound =>
+            n_subscriptions := n_subscriptions + count_subscribers(actors(publisher.id).subscribers_o);
+          when inbound =>
+            n_subscriptions := n_subscriptions + count_subscribers(actors(publisher.id).subscribers_i);
+        end case;
+      end loop;
+
+      return n_subscriptions;
+    end;
+    constant n_subscriptions : natural := num_of_subscriptions;
     variable subscriptions : subscription_vec_t(0 to 0);
---    variable item : subscriber_item_ptr_t;
---    variable idx : natural := 0;
+    variable idx : natural := 0;
+    variable ptr : natural;
   begin
---    for t in subscription_traffic_type_t'left to subscription_traffic_type_t'right loop
---      case t is
---        when published =>
---          item := actors(publisher.id).subscribers_p;
---        when outbound =>
---          item := actors(publisher.id).subscribers_o;
---        when inbound =>
---          item := actors(publisher.id).subscribers_i;
---      end case;
---      while item /= null loop
---        subscriptions(idx).subscriber := item.actor;
---        subscriptions(idx).publisher := publisher;
---        subscriptions(idx).traffic_type := t;
---        idx := idx + 1;
---        item := item.next_item;
---      end loop;
---    end loop;
+    for t in subscription_traffic_type_t'left to subscription_traffic_type_t'right loop
+      case t is
+        when published =>
+          ptr := to_integer(actors(publisher.id).subscribers_p.tail);
+          for i in 0 to count_subscribers(actors(publisher.id).subscribers_p)-1 loop
+            subscriptions(idx).subscriber := actors(publisher.id).subscribers_p.actors(ptr);
+            subscriptions(idx).publisher := publisher;
+            subscriptions(idx).traffic_type := t;
+            idx := idx + 1;
+            ptr := (ptr + 1) mod 256;
+          end loop;
+        when outbound =>
+          ptr := to_integer(actors(publisher.id).subscribers_o.tail);
+          for i in 0 to count_subscribers(actors(publisher.id).subscribers_o)-1 loop
+            subscriptions(idx).subscriber := actors(publisher.id).subscribers_o.actors(ptr);
+            subscriptions(idx).publisher := publisher;
+            subscriptions(idx).traffic_type := t;
+            idx := idx + 1;
+            ptr := (ptr + 1) mod 256;
+          end loop;
+        when inbound =>
+          ptr := to_integer(actors(publisher.id).subscribers_i.tail);
+          for i in 0 to count_subscribers(actors(publisher.id).subscribers_i)-1 loop
+            subscriptions(idx).subscriber := actors(publisher.id).subscribers_i.actors(ptr);
+            subscriptions(idx).publisher := publisher;
+            subscriptions(idx).traffic_type := t;
+            idx := idx + 1;
+            ptr := (ptr + 1) mod 256;
+          end loop;
+      end case;
+    end loop;
 
     return subscriptions;
   end;
