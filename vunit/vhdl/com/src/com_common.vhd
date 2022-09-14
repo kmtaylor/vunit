@@ -32,7 +32,7 @@ package body com_common_pkg is
 
   impure function no_error_status (status : com_status_t; old_api : boolean := false) return boolean is
   begin
-    return (status = ok) or ((status = timeout) and timeout_is_allowed and old_api);
+    return (status = ok) or ((status = timeout) and m_timeout_is_allowed and old_api);
   end;
 
 end package body com_common_pkg;
