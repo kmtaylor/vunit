@@ -34,59 +34,59 @@ package body com_pkg is
     outbox_size : positive := positive'high
     ) return actor_t is
   begin
-    return messenger.create(name, inbox_size, outbox_size);
+    return create(name, inbox_size, outbox_size);
   end;
 
   impure function find (name : string; enable_deferred_creation : boolean := true) return actor_t is
   begin
-    return messenger.find(name, enable_deferred_creation);
+    return find(name, enable_deferred_creation);
   end;
 
   impure function name (actor : actor_t) return string is
   begin
-    return messenger.name(actor);
+    return name(actor);
   end;
 
   procedure destroy (actor : inout actor_t) is
   begin
-    messenger.destroy(actor);
+    destroy(actor);
   end;
 
   procedure reset_messenger is
   begin
-    messenger.reset_messenger;
+    reset_messenger;
   end;
 
   impure function num_of_actors
     return natural is
   begin
-    return messenger.num_of_actors;
+    return num_of_actors;
   end;
 
   impure function is_deferred(actor : actor_t) return boolean is
   begin
-    return messenger.is_deferred(actor);
+    return is_deferred(actor);
   end;
 
   impure function num_of_deferred_creations
     return natural is
   begin
-    return messenger.num_of_deferred_creations;
+    return num_of_deferred_creations;
   end;
 
   impure function num_of_messages (actor : actor_t; mailbox_id : mailbox_id_t := inbox) return natural is
   begin
-    return messenger.num_of_messages(actor, mailbox_id);
+    return num_of_messages(actor, mailbox_id);
   end;
 
   impure function mailbox_size (actor : actor_t; mailbox_id : mailbox_id_t := inbox) return natural is
   begin
-    return messenger.mailbox_size(actor, mailbox_id);
+    return mailbox_size(actor, mailbox_id);
   end;
 
   procedure resize_mailbox (actor : actor_t; new_size : natural; mailbox_id : mailbox_id_t := inbox) is
   begin
-    messenger.resize_mailbox(actor, new_size, mailbox_id);
+    resize_mailbox(actor, new_size, mailbox_id);
   end;
 
   -----------------------------------------------------------------------------
@@ -97,10 +97,10 @@ package body com_pkg is
     subscription_traffic_types : subscription_traffic_types_t;
     timeout                    : time) is
   begin
-    if messenger.subscriber_inbox_is_full(publisher, subscription_traffic_types) then
-      wait on net until not messenger.subscriber_inbox_is_full(publisher, subscription_traffic_types) for timeout;
-      check(not messenger.subscriber_inbox_is_full(publisher, subscription_traffic_types), full_inbox_error);
-    end if;
+--    if subscriber_inbox_is_full(publisher, subscription_traffic_types) then
+--      wait on net until not subscriber_inbox_is_full(publisher, subscription_traffic_types) for timeout;
+--      check(not subscriber_inbox_is_full(publisher, subscription_traffic_types), full_inbox_error);
+--    end if;
   end procedure wait_on_subscribers;
 
   procedure send (
@@ -115,29 +115,30 @@ package body com_pkg is
       return;
     end if;
 
-    if not check(not messenger.unknown_actor(receiver), unknown_receiver_error) then
+    report("attempting to send: actor.id: " & integer'image(receiver.id));
+    if not check(not unknown_actor(receiver), unknown_receiver_error) then
       return;
     end if;
 
     t_start := now;
-    if messenger.is_full(receiver, mailbox_id) then
-      wait on net until not messenger.is_full(receiver, mailbox_id) for timeout;
-      check(not messenger.is_full(receiver, mailbox_id), full_inbox_error);
+    if is_full(receiver, mailbox_id) then
+      wait on net until not is_full(receiver, mailbox_id) for timeout;
+      check(not is_full(receiver, mailbox_id), full_inbox_error);
     end if;
 
-    messenger.send(receiver, mailbox_id, msg);
+    send(receiver, mailbox_id, msg);
 
-    if msg.sender /= null_actor then
-      if messenger.has_subscribers(msg.sender, outbound) then
-        wait_on_subscribers(msg.sender, (0             => outbound), timeout - (now - t_start));
-        messenger.internal_publish(msg.sender, msg, (0 => outbound));
-      end if;
-    end if;
-
-    if (mailbox_id = inbox) and messenger.has_subscribers(receiver, inbound) then
-      wait_on_subscribers(receiver, (0             => inbound), timeout - (now - t_start));
-      messenger.internal_publish(receiver, msg, (0 => inbound));
-    end if;
+--    if msg.sender /= null_actor then
+--      if has_subscribers(msg.sender, outbound) then
+--        wait_on_subscribers(msg.sender, (0             => outbound), timeout - (now - t_start));
+--        internal_publish(msg.sender, msg, (0 => outbound));
+--      end if;
+--    end if;
+--
+--    if (mailbox_id = inbox) and has_subscribers(receiver, inbound) then
+--      wait_on_subscribers(receiver, (0             => inbound), timeout - (now - t_start));
+--      internal_publish(receiver, msg, (0 => inbound));
+--    end if;
 
     notify(net);
     msg.data := null_queue;
@@ -194,7 +195,7 @@ package body com_pkg is
     variable receiver : actor_t;
   begin
     delete(msg);
-    wait_for_message(net, receivers, status, timeout);
+--    wait_for_message(net, receivers, status, timeout);
     if not check(no_error_status(status), status) then
       return;
     end if;
@@ -249,10 +250,10 @@ package body com_pkg is
     variable msg     : inout msg_t;
     constant timeout : in    time := max_timeout) is
   begin
-    wait_on_subscribers(sender, (published, outbound), timeout);
-    messenger.publish(sender, msg, (published, outbound));
-    notify(net);
-    recycle(queue_pool, msg.data);
+--    wait_on_subscribers(sender, (published, outbound), timeout);
+--    publish(sender, msg, (published, outbound));
+--    notify(net);
+--    recycle(queue_pool, msg.data);
   end;
 
   impure function peek_message(
@@ -261,13 +262,13 @@ package body com_pkg is
     mailbox_id : mailbox_id_t := inbox) return msg_t is
     variable msg : msg_t;
   begin
-    if position > messenger.num_of_messages(actor, mailbox_id) - 1 then
+    if position > num_of_messages(actor, mailbox_id) - 1 then
 --      failure(com_logger, "Peeking non-existing position.");
       return msg;
     end if;
 
-    msg      := messenger.get_all_but_payload(actor, position, mailbox_id);
-    msg.data := decode(messenger.get_payload(actor, position, mailbox_id));
+    msg      := get_all_but_payload(actor, position, mailbox_id);
+    msg.data := decode(get_payload(actor, position, mailbox_id));
 
     return msg;
   end;
@@ -344,16 +345,16 @@ package body com_pkg is
     constant timeout   : in  time := max_timeout) is
   begin
     for i in receivers'range loop
-      if not check(not messenger.deferred(receivers(i)), deferred_receiver_error) then
+      if not check(not deferred(receivers(i)), deferred_receiver_error) then
         status := deferred_receiver_error;
         return;
       end if;
     end loop;
 
     status := ok;
-    if not messenger.has_messages(receivers) then
-      wait on net until messenger.has_messages(receivers) for timeout;
-      if not messenger.has_messages(receivers) then
+    if not has_messages(receivers) then
+      wait on net until has_messages(receivers) for timeout;
+      if not has_messages(receivers) then
         status := work.com_types_pkg.timeout;
       end if;
     end if;
@@ -361,7 +362,7 @@ package body com_pkg is
 
   impure function has_message (actor : actor_t) return boolean is
   begin
-    return messenger.has_messages(actor);
+    return has_messages(actor);
   end function has_message;
 
   procedure get_message (
@@ -372,11 +373,11 @@ package body com_pkg is
     variable msg : inout msg_t) is
     variable started_with_full_mailbox : boolean;
   begin
-    started_with_full_mailbox := messenger.is_full(actor, mailbox_id);
+    started_with_full_mailbox := is_full(actor, mailbox_id);
 
-    msg      := messenger.get_all_but_payload(actor, position, mailbox_id);
-    msg.data := decode(messenger.get_payload(actor, position, mailbox_id));
-    messenger.delete_envelope(actor, position, mailbox_id);
+    msg      := get_all_but_payload(actor, position, mailbox_id);
+    msg.data := decode(get_payload(actor, position, mailbox_id));
+    delete_envelope(actor, position, mailbox_id);
 
     if started_with_full_mailbox then
       notify(net);
@@ -385,7 +386,7 @@ package body com_pkg is
 
   procedure get_message (signal net : inout network_t; receiver : actor_t; variable msg : inout msg_t) is
   begin
-    check(messenger.has_messages(receiver), null_message_error);
+    check(has_messages(receiver), null_message_error);
     get_message(net, receiver, 0, inbox, msg);
   end;
 
@@ -398,12 +399,12 @@ package body com_pkg is
     constant timeout    : in    time         := max_timeout) is
 
   begin
-    check(not messenger.deferred(actor), deferred_receiver_error);
+    check(not deferred(actor), deferred_receiver_error);
 
     status := ok;
-    if messenger.find_reply_message(actor, request_id, mailbox_id) = -1 then
-      wait on net until messenger.find_reply_message(actor, request_id, mailbox_id) /= -1 for timeout;
-      if messenger.find_reply_message(actor, request_id, mailbox_id) = -1 then
+    if find_reply_message(actor, request_id, mailbox_id) = -1 then
+      wait on net until find_reply_message(actor, request_id, mailbox_id) /= -1 for timeout;
+      if find_reply_message(actor, request_id, mailbox_id) = -1 then
         status := work.com_types_pkg.timeout;
       end if;
     end if;
@@ -433,7 +434,7 @@ package body com_pkg is
   begin
     source_actor := request_msg.sender when request_msg.sender /= null_actor else request_msg.receiver;
     mailbox_id   := inbox              when request_msg.sender /= null_actor else outbox;
-    position     := messenger.find_reply_message(source_actor, request_msg.id, mailbox_id);
+    position     := find_reply_message(source_actor, request_msg.id, mailbox_id);
 
     check(position /= -1, null_message_error);
 
@@ -448,7 +449,7 @@ package body com_pkg is
     publisher    : actor_t;
     traffic_type : subscription_traffic_type_t := published) is
   begin
-    messenger.subscribe(subscriber, publisher, traffic_type);
+    subscribe(subscriber, publisher, traffic_type);
   end procedure subscribe;
 
   procedure unsubscribe (
@@ -456,7 +457,7 @@ package body com_pkg is
     publisher    : actor_t;
     traffic_type : subscription_traffic_type_t := published) is
   begin
-    messenger.unsubscribe(subscriber, publisher, traffic_type);
+    unsubscribe(subscriber, publisher, traffic_type);
   end procedure unsubscribe;
 
   -----------------------------------------------------------------------------
@@ -464,12 +465,12 @@ package body com_pkg is
   -----------------------------------------------------------------------------
   impure function to_string(msg : msg_t) return string is
   begin
-    return messenger.to_string(msg);
+    return to_string(msg);
   end;
 
   impure function peek_all_messages(actor : actor_t; mailbox_id : mailbox_id_t := inbox) return msg_vec_ptr_t is
     variable msg_vec_ptr : msg_vec_ptr_t;
-    constant n_messages  : natural := messenger.num_of_messages(actor, mailbox_id);
+    constant n_messages  : natural := num_of_messages(actor, mailbox_id);
   begin
     if n_messages = 0 then
       return null;
@@ -512,7 +513,7 @@ package body com_pkg is
     write(l, indent & "  Messages:");
     if messages /= null then
       for i in messages'range loop
-        write(l, LF & indent & "    " & to_string(i) & ". " & messenger.to_string(messages(i)));
+        write(l, LF & indent & "    " & to_string(i) & ". " & to_string(messages(i)));
       end loop;
     end if;
 
@@ -522,7 +523,7 @@ package body com_pkg is
   end;
 
   impure function get_subscriptions(subscriber : actor_t) return subscription_vec_ptr_t is
-    constant subscriptions : subscription_vec_t := messenger.get_subscriptions(subscriber);
+    constant subscriptions : subscription_vec_t := get_subscriptions(subscriber);
   begin
     if subscriptions'length = 0 then
       return null;
@@ -532,7 +533,7 @@ package body com_pkg is
   end;
 
   impure function get_subscribers(publisher : actor_t) return subscription_vec_ptr_t is
-    constant subscriptions : subscription_vec_t := messenger.get_subscribers(publisher);
+    constant subscriptions : subscription_vec_t := get_subscribers(publisher);
   begin
     if subscriptions'length = 0 then
       return null;
@@ -608,8 +609,8 @@ package body com_pkg is
 
   impure function get_messenger_state return messenger_state_t is
     variable state                    : messenger_state_t;
-    constant actors                   : actor_vec_t := messenger.get_all_actors;
-    constant n_deferred               : natural     := messenger.num_of_deferred_creations;
+    constant actors                   : actor_vec_t := get_all_actors;
+    constant n_deferred               : natural     := num_of_deferred_creations;
     constant n_active                 : natural     := actors'length - n_deferred;
     variable active_idx, deferred_idx : natural     := 0;
   begin
@@ -652,7 +653,7 @@ package body com_pkg is
   end;
 
   impure function get_messenger_state_string(indent : string := "") return string is
-    constant actors                            : actor_vec_t := messenger.get_all_actors;
+    constant actors                            : actor_vec_t := get_all_actors;
     variable l, active_actors, deferred_actors : line;
     variable first_deferred                    : boolean     := true;
   begin
@@ -688,12 +689,12 @@ package body com_pkg is
   -----------------------------------------------------------------------------
   procedure allow_timeout is
   begin
-    messenger.allow_timeout;
+    allow_timeout;
   end;
 
   procedure allow_deprecated is
   begin
-    messenger.allow_deprecated;
+    allow_deprecated;
   end;
 
 end package body com_pkg;

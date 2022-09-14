@@ -24,7 +24,6 @@ use std.textio.all;
 package com_messenger_pkg is
   type subscription_traffic_types_t is array (natural range <>) of subscription_traffic_type_t;
 
-  type messenger_t is protected
     -----------------------------------------------------------------------------
     -- Handling of actors
     -----------------------------------------------------------------------------
@@ -160,18 +159,9 @@ package com_messenger_pkg is
     procedure allow_deprecated;
     procedure deprecated (msg : string);
 
-  end protected;
 end package com_messenger_pkg;
 
 package body com_messenger_pkg is
---  type envelope_t;
---  type envelope_ptr_t is access envelope_t;
---
---  type envelope_t is record
---    message       : message_t;
---    next_envelope : envelope_ptr_t;
---  end record envelope_t;
---  type envelope_ptr_array is array (positive range <>) of envelope_ptr_t;
 
   type message_array_t is array (natural range <>) of message_t;
 
@@ -187,23 +177,6 @@ package body com_messenger_pkg is
     return to_integer(mbox.head - mbox.tail);
   end;
 
---  type mailbox_ptr_t is access mailbox_t;
---
---  impure function create(size : natural := natural'high)
---    return mailbox_ptr_t is
---  begin
---    return new mailbox_t'(0, size, null, null);
---  end function create;
---
---  -- TODO: subscriber can be simplified to a pointer to an array.
---  type subscriber_item_t;
---  type subscriber_item_ptr_t is access subscriber_item_t;
---
---  type subscriber_item_t is record
---    actor     : actor_t;
---    next_item : subscriber_item_ptr_t;
---  end record subscriber_item_t;
-
   type subscriber_item_t is record
     actors    : actor_vec_t(0 to 2**8-1);
     head      : unsigned(7 downto 0);
@@ -216,8 +189,6 @@ package body com_messenger_pkg is
     return to_integer(subs.head - subs.tail);
   end;
 
---  type subscribers_t is array (subscription_traffic_type_t range published to inbound) of subscriber_item_ptr_t;
-
   type actor_item_t is record
     actor             : actor_t;
     name              : line;
@@ -228,75 +199,40 @@ package body com_messenger_pkg is
     subscribers_p     : subscriber_item_t;
     subscribers_o     : subscriber_item_t;
     subscribers_i     : subscriber_item_t;
---    subscribers       : subscribers_t;
   end record actor_item_t;
 
   type actor_item_array_t is array (natural range <>) of actor_item_t;
-  type actor_item_array_ptr_t is access actor_item_array_t;
 
-  type messenger_t is protected body
-    variable null_message         : message_t    := (no_message_id, null_msg_type, ok, null_actor,
-                                                     null_actor, no_message_id, (others => nul));
+  constant null_message : message_t := (no_message_id, null_msg_type, ok, null_actor,
+                                        null_actor, no_message_id, (others => nul));
 
-    variable null_actor_item : actor_item_t := (
-      actor             => null_actor,
-      name              => null,
-      deferred_creation => false,
-      inbox             => ((others => null_message), (others => '0'), (others => '0')),
-      outbox            => ((others => null_message), (others => '0'), (others => '0')),
+  shared variable null_actor_item : actor_item_t := (
+    actor             => null_actor,
+    name              => null,
+    deferred_creation => false,
+    inbox             => ((others => null_message), (others => '0'), (others => '0')),
+    outbox            => ((others => null_message), (others => '0'), (others => '0')),
 --        reply_stash       => null,
-      subscribers_p     => ((others => null_actor), (others => '0'), (others => '0')),
-      subscribers_o     => ((others => null_actor), (others => '0'), (others => '0')),
-      subscribers_i     => ((others => null_actor), (others => '0'), (others => '0')));
+    subscribers_p     => ((others => null_actor), (others => '0'), (others => '0')),
+    subscribers_o     => ((others => null_actor), (others => '0'), (others => '0')),
+    subscribers_i     => ((others => null_actor), (others => '0'), (others => '0'))
+  );
 
---    variable envelope_recycle_bin : envelope_ptr_array(1 to 1000);
---    variable n_recycled_envelopes : natural      := 0;
-    variable next_message_id      : message_id_t := no_message_id + 1;
-    variable timeout_allowed      : boolean      := false;
-    variable deprecated_allowed   : boolean      := false;
+  shared variable next_message_id      : message_id_t := no_message_id + 1;
+  shared variable timeout_allowed      : boolean      := false;
+  shared variable deprecated_allowed   : boolean      := false;
 
-    -----------------------------------------------------------------------------
-    -- Handling of actors
-    -----------------------------------------------------------------------------
---    impure function new_envelope return envelope_ptr_t is
---    begin
---      if n_recycled_envelopes > 0 then
---        n_recycled_envelopes                                         := n_recycled_envelopes - 1;
---        envelope_recycle_bin(n_recycled_envelopes + 1).message       := null_message;
---        envelope_recycle_bin(n_recycled_envelopes + 1).next_envelope := null;
---        return envelope_recycle_bin(n_recycled_envelopes + 1);
---      else
---        return new envelope_t;
---      end if;
---    end new_envelope;
---
---  procedure deallocate_envelope (ptr : inout envelope_ptr_t) is
---  begin
---    if (n_recycled_envelopes < envelope_recycle_bin'length) and (ptr /= null) then
---      n_recycled_envelopes                       := n_recycled_envelopes + 1;
---      envelope_recycle_bin(n_recycled_envelopes) := ptr;
---      ptr                                        := null;
---    else
---      deallocate(ptr);
---    end if;
---  end deallocate_envelope;
+  -----------------------------------------------------------------------------
+  -- Handling of actors
+  -----------------------------------------------------------------------------
 
-  impure function init_actors return actor_item_array_ptr_t is
-    variable ret_val : actor_item_array_ptr_t;
-  begin
-    ret_val    := new actor_item_array_t(0 to 0);
-    ret_val(0) := null_actor_item;
-
-    return ret_val;
-  end function init_actors;
-
-  variable actors : actor_item_array_ptr_t := init_actors;
-  variable num_actors : natural := 1;
+  shared variable actors : actor_item_array_t(0 to 2**8-1) := (others => null_actor_item);
+  shared variable num_actors : natural := 1;
 
   impure function find_actor (name : string) return actor_t is
     variable ret_val : actor_t;
   begin
-    for i in actors'reverse_range loop
+    for i in num_actors-1 downto 1 loop
       ret_val := actors(i).actor;
       if actors(i).name /= null then
         exit when actors(i).name.all = name;
@@ -312,15 +248,7 @@ package body com_messenger_pkg is
     inbox_size        : in natural := natural'high;
     outbox_size       : in natural := natural'high)
     return actor_t is
-    variable old_actors : actor_item_array_ptr_t;
   begin
-    old_actors := actors;
-    actors     := new actor_item_array_t(0 to num_actors);
-    actors(0)  := null_actor_item;
-    for i in old_actors'range loop
-      actors(i) := old_actors(i);
-    end loop;
-    deallocate(old_actors);
     actors(num_actors) := ((id => num_actors), new string'(name), deferred_creation,
                            ((others => null_message), (others => '0'), (others => '0')),
                            ((others => null_message), (others => '0'), (others => '0')),
@@ -351,7 +279,6 @@ package body com_messenger_pkg is
     else
       return "";
     end if;
-
   end;
 
 
@@ -462,7 +389,7 @@ package body com_messenger_pkg is
   begin
     check(not unknown_actor(actor), unknown_actor_error);
 
-    for i in actors'range loop
+    for i in 1 to num_actors-1 loop
       for t in subscription_traffic_type_t'left to subscription_traffic_type_t'right loop
         if is_subscriber(actor, actors(i).actor, t) then
           remove_subscriber(actor, actors(i).actor, t);
@@ -477,20 +404,17 @@ package body com_messenger_pkg is
 
   procedure reset_messenger is
   begin
-    for i in actors'range loop
-      if actors(i).actor /= null_actor then
-        destroy(actors(i).actor);
-      end if;
+    for i in 0 to 2**8-1 loop
+      actors(i) := null_actor_item;
     end loop;
-    deallocate(actors);
-    actors          := init_actors;
+    num_actors      := 1;
     next_message_id := no_message_id + 1;
   end;
 
   impure function num_of_actors return natural is
     variable n_actors : natural := 0;
   begin
-    for i in actors'range loop
+    for i in 1 to num_actors-1 loop
       if actors(i).actor /= null_actor then
         n_actors := n_actors + 1;
       end if;
@@ -504,7 +428,7 @@ package body com_messenger_pkg is
     variable result : actor_vec_t(0 to n_actors - 1);
     variable idx : natural := 0;
   begin
-    for i in actors'range loop
+    for i in 1 to num_actors-1 loop
       if actors(i).actor /= null_actor then
         result(idx) := actors(i).actor;
         idx := idx + 1;
@@ -523,7 +447,7 @@ package body com_messenger_pkg is
   impure function num_of_deferred_creations return natural is
     variable n_deferred_actors : natural := 0;
   begin
-    for i in actors'range loop
+    for i in 1 to num_actors-1 loop
       if actors(i).deferred_creation then
         n_deferred_actors := n_deferred_actors + 1;
       end if;
@@ -1156,7 +1080,7 @@ package body com_messenger_pkg is
 --      variable n_subscriptions : natural := 0;
 --      variable item : subscriber_item_ptr_t;
 --    begin
---      for a in actors'range loop
+--      for a in 1 to num_actors-1 loop
 --        for t in subscription_traffic_type_t'left to subscription_traffic_type_t'right loop
 --          case t is
 --            when published =>
@@ -1183,7 +1107,7 @@ package body com_messenger_pkg is
 --    variable item : subscriber_item_ptr_t;
 --    variable idx : natural := 0;
   begin
---    for a in actors'range loop
+--    for a in 1 to num_actors-1 loop
 --      for t in subscription_traffic_type_t'left to subscription_traffic_type_t'right loop
 --        case t is
 --          when published =>
@@ -1279,6 +1203,5 @@ package body com_messenger_pkg is
   begin
     check(deprecated_allowed, deprecated_interface_error, msg);
   end;
-end protected body;
 
 end package body com_messenger_pkg;
