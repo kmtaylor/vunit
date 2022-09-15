@@ -776,16 +776,37 @@ package body com_messenger_pkg is
     return false;
   end function m_has_messages;
 
+  procedure m_get_message (
+    mailbox    : mailbox_t;
+    position   : natural;
+    msg        : out message_t;
+    found      : out boolean) is
+    variable idx : natural := to_integer(mailbox.tail + position);
+  begin
+    if m_count_messages(mailbox) <= position then
+      found := false;
+    else
+      found := true;
+      msg   := mailbox.messages(idx);
+    end if;
+  end;
+
   impure function m_get_payload (
     actor      : actor_t;
     position   : natural      := 0;
     mailbox_id : mailbox_id_t := inbox) return string is
-    variable idx : natural := to_integer(actors(actor.id).inbox.tail + position);
+    variable msg : message_t;
+    variable found : boolean;
   begin
-    if m_count_messages(actors(actor.id).inbox) <= position then
-      return "";
+    if mailbox_id = inbox then
+      m_get_message(actors(actor.id).inbox, position, msg, found);
     else
-      return actors(actor.id).inbox.messages(idx).payload;
+      m_get_message(actors(actor.id).outbox, position, msg, found);
+    end if;
+    if found then
+      return msg.payload;
+    else
+      return "";
     end if;
   end;
 
@@ -793,12 +814,18 @@ package body com_messenger_pkg is
     actor      : actor_t;
     position   : natural      := 0;
     mailbox_id : mailbox_id_t := inbox) return actor_t is
-    variable idx : natural := to_integer(actors(actor.id).inbox.tail + position);
+    variable msg : message_t;
+    variable found : boolean;
   begin
-    if m_count_messages(actors(actor.id).inbox) <= position then
-      return null_actor;
+    if mailbox_id = inbox then
+      m_get_message(actors(actor.id).inbox, position, msg, found);
     else
-      return actors(actor.id).inbox.messages(idx).sender;
+      m_get_message(actors(actor.id).outbox, position, msg, found);
+    end if;
+    if found then
+      return msg.sender;
+    else
+      return null_actor;
     end if;
   end;
 
@@ -806,12 +833,18 @@ package body com_messenger_pkg is
     actor      : actor_t;
     position   : natural      := 0;
     mailbox_id : mailbox_id_t := inbox) return actor_t is
-    variable idx : natural := to_integer(actors(actor.id).inbox.tail + position);
+    variable msg : message_t;
+    variable found : boolean;
   begin
-    if m_count_messages(actors(actor.id).inbox) <= position then
-      return null_actor;
+    if mailbox_id = inbox then
+      m_get_message(actors(actor.id).inbox, position, msg, found);
     else
-      return actors(actor.id).inbox.messages(idx).receiver;
+      m_get_message(actors(actor.id).outbox, position, msg, found);
+    end if;
+    if found then
+      return msg.receiver;
+    else
+      return null_actor;
     end if;
   end;
 
@@ -819,12 +852,18 @@ package body com_messenger_pkg is
     actor      : actor_t;
     position   : natural      := 0;
     mailbox_id : mailbox_id_t := inbox) return message_id_t is
-    variable idx : natural := to_integer(actors(actor.id).inbox.tail + position);
+    variable msg : message_t;
+    variable found : boolean;
   begin
-    if m_count_messages(actors(actor.id).inbox) <= position then
-      return no_message_id;
+    if mailbox_id = inbox then
+      m_get_message(actors(actor.id).inbox, position, msg, found);
     else
-      return actors(actor.id).inbox.messages(idx).id;
+      m_get_message(actors(actor.id).outbox, position, msg, found);
+    end if;
+    if found then
+      return msg.id;
+    else
+      return no_message_id;
     end if;
   end;
 
@@ -832,12 +871,18 @@ package body com_messenger_pkg is
     actor      : actor_t;
     position   : natural      := 0;
     mailbox_id : mailbox_id_t := inbox) return message_id_t is
-    variable idx : natural := to_integer(actors(actor.id).inbox.tail + position);
+    variable msg : message_t;
+    variable found : boolean;
   begin
-    if m_count_messages(actors(actor.id).inbox) <= position then
-      return no_message_id;
+    if mailbox_id = inbox then
+      m_get_message(actors(actor.id).inbox, position, msg, found);
     else
-      return actors(actor.id).inbox.messages(idx).request_id;
+      m_get_message(actors(actor.id).outbox, position, msg, found);
+    end if;
+    if found then
+      return msg.request_id;
+    else
+      return no_message_id;
     end if;
   end;
 
@@ -845,19 +890,26 @@ package body com_messenger_pkg is
     actor      : actor_t;
     position   : natural      := 0;
     mailbox_id : mailbox_id_t := inbox) return msg_t is
-    variable idx : natural := to_integer(actors(actor.id).inbox.tail + position);
     variable msg : msg_t;
+    variable message : message_t;
+    variable found : boolean;
   begin
-    if m_count_messages(actors(actor.id).inbox) <= position then
-      msg := null_msg;
+    if mailbox_id = inbox then
+      m_get_message(actors(actor.id).inbox, position, message, found);
     else
-      msg.id          := actors(actor.id).inbox.messages(idx).id;
-      msg.msg_type    := actors(actor.id).inbox.messages(idx).msg_type;
-      msg.status      := actors(actor.id).inbox.messages(idx).status;
-      msg.sender      := actors(actor.id).inbox.messages(idx).sender;
-      msg.receiver    := actors(actor.id).inbox.messages(idx).receiver;
-      msg.request_id  := actors(actor.id).inbox.messages(idx).request_id;
+      m_get_message(actors(actor.id).outbox, position, message, found);
+    end if;
+
+    if found then
+      msg.id          := message.id;
+      msg.msg_type    := message.msg_type;
+      msg.status      := message.status;
+      msg.sender      := message.sender;
+      msg.receiver    := message.receiver;
+      msg.request_id  := message.request_id;
       msg.data        := null_queue;
+    else
+      msg := null_msg;
     end if;
 
     return msg;
