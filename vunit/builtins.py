@@ -74,9 +74,9 @@ class Builtins(object):
             if not supports_context and file_name.endswith("_context.vhd"):
                 continue
 
-            if (self._simulator_class.name == "xsim") and file_name.endswith(
-                "_context.vhd"
-            ):
+            if (self._simulator_class.name == "xsim") and (
+                    file_name.endswith("vunit_run_context.vhd") or
+                    file_name.endswith("vunit_context.vhd")):
                 continue
 
             self._vunit_lib.add_source_file(file_name)
@@ -94,44 +94,6 @@ class Builtins(object):
         if simulator_is("xsim"):
             self._add_files(VHDL_PATH / "xsim" / "data_types" / "src" / "*.vhd")
 
-            use_ext = {"string": False, "integer": False}
-            files = {"string": None, "integer": None}
-
-            if external:
-                for ind, val in external.items():
-                    if isinstance(val, bool):
-                        use_ext[ind] = val
-                    else:
-                        use_ext[ind] = True
-                        files[ind] = val
-
-            for _, val in use_ext.items():
-                if val and simulator_check(
-                    lambda simclass: not simclass.supports_vhpi()
-                ):
-                    raise RuntimeError(
-                        "the selected simulator does not support VHPI; must use non-VHPI packages..."
-                    )
-
-            ext_path = (VHDL_PATH / "xsim" / "data_types" / "src" / "external")
-
-            def default_files(cond, type_str):
-                """
-                Return name of VHDL file with default VHPIDIRECT foreign declarations.
-                """
-                return [
-                    ext_path / ("external_" + type_str + "-" + ("" if cond else "no") + "vhpi.vhd"),
-                    ext_path, ("external_" + type_str + "-body.vhd"),
-                ]
-
-            if not files["string"]:
-                files["string"] = default_files(use_ext["string"], "string")
-
-            if not files["integer"]:
-                files["integer"] = default_files(use_ext["integer"], "integer_vector")
-
-            for _, name in files.items():
-                self._add_files(name)
         else:
             self._add_files(VHDL_PATH / "data_types" / "src" / "*.vhd")
 
@@ -190,7 +152,12 @@ class Builtins(object):
         """
         if not self._vhdl_standard >= VHDL.STD_2008:
             raise RuntimeError("Verification component library only supports vhdl 2008 and later")
-        self._add_files(VHDL_PATH / "verification_components" / "src" / "*.vhd")
+
+        if simulator_is("xsim"):
+            self._add_files(VHDL_PATH / "xsim" / "verification_components" / "src" / "*.vhd")
+
+        else:
+            self._add_files(VHDL_PATH / "verification_components" / "src" / "*.vhd")
 
     def _add_library_if_not_exist(self, library_name, message):
         """
@@ -294,20 +261,15 @@ in your VUnit Git repository? You have to do this first if installing using setu
         self._add_data_types(external=external)
         if simulator_is("xsim"):
             self._add_files(VHDL_PATH / "*.vhd")
-            libraries = [
-                "xsim",
+            for path in (
                 "string_ops",
                 "dictionary",
                 "core",
                 "logging",
                 "check",
                 "run",
-            ]
-            for path in (libraries):
-                if simulator_is("xsim"):
-                    self._add_files(VHDL_PATH / "xsim" / path / "src" / "*.vhd")
-                else:
-                    self._add_files(VHDL_PATH / path / "src" / "*.vhd")
+            ):
+                self._add_files(VHDL_PATH / "xsim" / path / "src" / "*.vhd")
 
         else:
             self._add_files(VHDL_PATH / "*.vhd")
