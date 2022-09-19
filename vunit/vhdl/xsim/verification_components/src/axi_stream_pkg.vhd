@@ -157,6 +157,7 @@ package axi_stream_pkg is
 --  constant axi_stream_checker : checker_t := new_checker(axi_stream_logger);
 
   impure function new_axi_stream_master(
+    name             : string;
     data_length      : natural;
     id_length        : natural                       := 0;
     dest_length      : natural                       := 0;
@@ -169,6 +170,7 @@ package axi_stream_pkg is
   ) return axi_stream_master_t;
 
   impure function new_axi_stream_slave(
+    name             : string;
     data_length      : natural;
     id_length        : natural                       := 0;
     dest_length      : natural                       := 0;
@@ -385,6 +387,7 @@ package body axi_stream_pkg is
   end;
 
   impure function new_axi_stream_master(
+    name             : string;
     data_length      : natural;
     id_length        : natural                       := 0;
     dest_length      : natural                       := 0;
@@ -400,7 +403,7 @@ package body axi_stream_pkg is
     variable p_protocol_checker : axi_stream_protocol_checker_t;
   begin
     p_monitor          := get_valid_monitor(data_length, id_length, dest_length, user_length, actor, monitor, "master");
-    p_actor            := actor when actor /= null_actor else new_actor;
+    p_actor            := actor when actor /= null_actor else new_actor(name);
     p_protocol_checker := get_valid_protocol_checker(data_length, id_length, dest_length, user_length, actor, protocol_checker, "master");
 
     return (p_actor      => p_actor,
@@ -415,6 +418,7 @@ package body axi_stream_pkg is
   end;
 
   impure function new_axi_stream_slave(
+      name             : string;
       data_length      : natural;
       id_length        : natural                       := 0;
       dest_length      : natural                       := 0;
@@ -430,7 +434,7 @@ package body axi_stream_pkg is
     variable p_protocol_checker : axi_stream_protocol_checker_t;
   begin
     p_monitor          := get_valid_monitor(data_length, id_length, dest_length, user_length, actor, monitor, "slave");
-    p_actor            := actor when actor /= null_actor else new_actor;
+    p_actor            := actor when actor /= null_actor else new_actor(name);
     p_protocol_checker := get_valid_protocol_checker(data_length, id_length, dest_length, user_length, actor, protocol_checker, "slave");
 
     return (p_actor      => p_actor,
