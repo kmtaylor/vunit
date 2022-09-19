@@ -30,8 +30,8 @@ package body com_pkg is
   -----------------------------------------------------------------------------
   impure function new_actor (
     name        : string   := "";
-    inbox_size  : positive := positive'high;
-    outbox_size : positive := positive'high
+    inbox_size  : positive := 2**C_MAX_MSGS_L2-1;
+    outbox_size : positive := 2**C_MAX_MSGS_L2-1
     ) return actor_t is
   begin
     return m_create(name, inbox_size, outbox_size);

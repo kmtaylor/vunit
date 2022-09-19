@@ -30,8 +30,8 @@ package com_messenger_pkg is
     -----------------------------------------------------------------------------
     impure function m_create (
       name : string := "";
-      inbox_size : positive := positive'high;
-      outbox_size : positive := positive'high
+      inbox_size : positive := 2**C_MAX_MSGS_L2-1;
+      outbox_size : positive := 2**C_MAX_MSGS_L2-1
       ) return actor_t;
     impure function m_find (name  : string; enable_deferred_creation : boolean := true) return actor_t;
     impure function m_name (actor : actor_t) return string;
@@ -170,28 +170,35 @@ package body com_messenger_pkg is
   type message_array_t is array (natural range <>) of message_t;
 
   type mailbox_t is record
-    messages  : message_array_t(0 to 2**12-1);
-    head      : unsigned(11 downto 0);
-    tail      : unsigned(11 downto 0);
+    size      : natural;
+    head      : unsigned(C_MAX_MSGS_L2-1 downto 0);
+    tail      : unsigned(C_MAX_MSGS_L2-1 downto 0);
+    messages  : message_array_t(0 to 2**C_MAX_MSGS_L2-1);
   end record mailbox_t;
 
-  constant null_mailbox : mailbox_t := ((others => null_message), (others => '0'), (others => '0'));
+  constant null_mailbox : mailbox_t := (0, (others => '0'), (others => '0'), (others => null_message));
 
-  function m_count_messages(mbox : mailbox_t)
+  function m_new_mailbox (size : natural := 2**C_MAX_MSGS_L2-1)
+    return mailbox_t is
+  begin
+    return (size, (others => '0'), (others => '0'), (others => null_message));
+  end;
+
+  function m_count_messages (mbox : mailbox_t)
     return natural is
   begin
     return to_integer(mbox.head - mbox.tail);
   end;
 
   type subscriber_item_t is record
-    actors    : actor_vec_t(0 to 2**8-1);
-    head      : unsigned(7 downto 0);
-    tail      : unsigned(7 downto 0);
+    actors    : actor_vec_t(0 to 2**C_MAX_ACTORS_L2-1);
+    head      : unsigned(C_MAX_ACTORS_L2-1 downto 0);
+    tail      : unsigned(C_MAX_ACTORS_L2-1 downto 0);
   end record subscriber_item_t;
 
   constant null_subscribers : subscriber_item_t := ((others => null_actor), (others => '0'), (others => '0'));
 
-  function m_count_subscribers(subs : subscriber_item_t)
+  function m_count_subscribers (subs : subscriber_item_t)
     return natural is
   begin
     return to_integer(subs.head - subs.tail);
@@ -231,7 +238,7 @@ package body com_messenger_pkg is
   -- Handling of actors
   -----------------------------------------------------------------------------
 
-  shared variable actors : actor_item_array_t(0 to 2**8-1) := (others => null_actor_item);
+  shared variable actors : actor_item_array_t(0 to 2**C_MAX_ACTORS_L2-1) := (others => null_actor_item);
   shared variable num_actors : natural := 1;
 
   impure function m_find_actor (name : string) return actor_t is
@@ -250,12 +257,13 @@ package body com_messenger_pkg is
   impure function m_create_actor (
     name              :    string  := "";
     deferred_creation : in boolean := false;
-    inbox_size        : in natural := natural'high;
-    outbox_size       : in natural := natural'high)
+    inbox_size        : in natural := 2**C_MAX_MSGS_L2-1;
+    outbox_size       : in natural := 2**C_MAX_MSGS_L2-1)
     return actor_t is
   begin
     actors(num_actors) := ((id => num_actors), new string'(name), deferred_creation,
-                           null_mailbox, null_mailbox, null_subscribers, null_subscribers, null_subscribers);
+                           m_new_mailbox(inbox_size), m_new_mailbox(outbox_size),
+                           null_subscribers, null_subscribers, null_subscribers);
 
     num_actors := num_actors + 1;
     return actors(num_actors - 1).actor;
@@ -285,8 +293,8 @@ package body com_messenger_pkg is
 
   impure function m_create (
     name : string := "";
-    inbox_size : positive := positive'high;
-    outbox_size : positive := positive'high
+    inbox_size : positive := 2**C_MAX_MSGS_L2-1;
+    outbox_size : positive := 2**C_MAX_MSGS_L2-1
     ) return actor_t is
     variable actor : actor_t := m_find_actor(name);
   begin
@@ -294,8 +302,8 @@ package body com_messenger_pkg is
       actor := m_create_actor(name, false, inbox_size, outbox_size);
     elsif actors(actor.id).deferred_creation then
       actors(actor.id).deferred_creation := false;
---      actors(actor.id).inbox.size        := inbox_size;
---      actors(actor.id).outbox.size       := outbox_size;
+      actors(actor.id).inbox.size        := inbox_size;
+      actors(actor.id).outbox.size       := outbox_size;
     else
       check_failed(duplicate_actor_name_error);
     end if;
@@ -313,7 +321,7 @@ package body com_messenger_pkg is
       if subscribers.actors(ptr) = subscriber then
         return true;
       end if;
-      ptr := (ptr + 1) mod 256;
+      ptr := (ptr + 1) mod 2**C_MAX_ACTORS_L2;
     end loop;
     return false;
   end;
@@ -343,7 +351,7 @@ package body com_messenger_pkg is
 
 
   procedure m_remove_subscriber (subscribers : inout subscriber_item_t; subscriber : actor_t; found : inout boolean) is
-    variable llist  : actor_vec_t(0 to 2**8-1);
+    variable llist  : actor_vec_t(0 to 2**C_MAX_ACTORS_L2-1);
     variable lptr   : natural := 0;
     variable n_subs : natural := m_count_subscribers(subscribers);
     variable ptr    : natural := to_integer(subscribers.tail);
@@ -355,18 +363,18 @@ package body com_messenger_pkg is
       else
         found := true;
       end if;
-      ptr := (ptr + 1) mod 256;
+      ptr := (ptr + 1) mod 2**C_MAX_ACTORS_L2;
     end loop;
     if not found then
       return;
     end if;
     -- Flush list
-    subscribers.tail := to_unsigned(ptr, 8);
+    subscribers.tail := to_unsigned(ptr, C_MAX_ACTORS_L2);
     for i in 0 to n_subs-2 loop
       subscribers.actors(ptr) := llist(i);
-      ptr := (ptr + 1) mod 256;
+      ptr := (ptr + 1) mod 2**C_MAX_ACTORS_L2;
     end loop;
-    subscribers.head := to_unsigned(ptr, 8); 
+    subscribers.head := to_unsigned(ptr, C_MAX_ACTORS_L2); 
   end;
 
   procedure m_remove_subscriber (subscriber : actor_t; publisher : actor_t; traffic_type : subscription_traffic_type_t) is
@@ -405,7 +413,7 @@ package body com_messenger_pkg is
 
   procedure m_reset_messenger is
   begin
-    for i in 0 to 2**8-1 loop
+    for i in 0 to 2**C_MAX_ACTORS_L2-1 loop
       actors(i) := null_actor_item;
     end loop;
     num_actors      := 1;
@@ -476,9 +484,9 @@ package body com_messenger_pkg is
   impure function m_is_full (actor : actor_t; mailbox_id : mailbox_id_t) return boolean is
   begin
     if mailbox_id = inbox then
-      return m_count_messages(actors(actor.id).inbox) = 255;
+      return m_count_messages(actors(actor.id).inbox) >= actors(actor.id).inbox.size;
     else
-      return m_count_messages(actors(actor.id).outbox) = 255;
+      return m_count_messages(actors(actor.id).outbox) >= actors(actor.id).outbox.size;
     end if;
   end function;
 
@@ -493,6 +501,13 @@ package body com_messenger_pkg is
 
   procedure m_resize_mailbox (actor : actor_t; new_size : natural; mailbox_id : mailbox_id_t) is
   begin
+    if mailbox_id = inbox then
+      check(m_count_messages(actors(actor.id).inbox) <= new_size, insufficient_size_error);
+      actors(actor.id).inbox.size         := new_size;
+    else
+      check(m_count_messages(actors(actor.id).outbox) <= new_size, insufficient_size_error);
+      actors(actor.id).outbox.size         := new_size;
+    end if;
   end;
 
   impure function m_subscriber_inbox_is_full (
@@ -511,7 +526,7 @@ package body com_messenger_pkg is
         exit when result;
         m_has_full_inboxes(actors(subscribers.actors(ptr).id).subscribers_i, result);
         exit when result;
-        ptr := (ptr + 1) mod 256;
+        ptr := (ptr + 1) mod 2**C_MAX_ACTORS_L2;
       end loop;
     end;
   begin
@@ -545,7 +560,11 @@ package body com_messenger_pkg is
 
   impure function m_mailbox_size (actor : actor_t; mailbox_id : mailbox_id_t) return natural is
   begin
-    return 2**12-1;
+    if mailbox_id = inbox then
+      return actors(actor.id).inbox.size;
+    else
+      return actors(actor.id).outbox.size;
+    end if;
   end function;
 
   -----------------------------------------------------------------------------
@@ -593,7 +612,7 @@ package body com_messenger_pkg is
 
     for i in 0 to n_subs-1 loop
       m_send(sender, actors(sender.id).subscribers_p.actors(ptr), inbox, no_message_id, payload, receipt);
-      ptr := (ptr + 1) mod 256;
+      ptr := (ptr + 1) mod 2**C_MAX_ACTORS_L2;
     end loop;
   end;
 
@@ -648,7 +667,7 @@ package body com_messenger_pkg is
     end if;
 
 --    if is_visible(com_logger, trace) then
---      trace(com_logger, "[" & to_string(msg) & "] => " & m_name(receiver) & " " & mailbox_id_t'image(mailbox_id));
+--      trace(com_logger, "[" & m_to_string(msg) & "] => " & m_name(receiver) & " " & mailbox_id_t'image(mailbox_id));
 --    end if;
 
     if mailbox_id = inbox then
@@ -685,7 +704,7 @@ package body com_messenger_pkg is
       end if;
       m_put_message(subscribers.actors(ptr), msg, inbox, true);
       m_internal_publish(subscribers.actors(ptr), msg, (0 => inbound));
-      ptr := (ptr + 1) mod 256;
+      ptr := (ptr + 1) mod 2**C_MAX_ACTORS_L2;
     end loop;
   end;
 
@@ -916,13 +935,12 @@ package body com_messenger_pkg is
   end;
 
   procedure m_delete_envelope (
-    actor      : actor_t;
     position   : natural      := 0;
-    mailbox_id : mailbox_id_t := inbox) is
-    variable llist  : message_array_t(0 to 2**12-1);
+    mailbox    : inout mailbox_t) is
+    variable llist  : message_array_t(0 to 2**C_MAX_MSGS_L2-1);
     variable lptr   : natural := 0;
-    variable n_msgs : natural := m_count_messages(actors(actor.id).inbox);
-    variable ptr    : natural := to_integer(actors(actor.id).inbox.tail);
+    variable n_msgs : natural := m_count_messages(mailbox);
+    variable ptr    : natural := to_integer(mailbox.tail);
   begin
     if n_msgs <= position then
       return;
@@ -930,22 +948,34 @@ package body com_messenger_pkg is
 
     if position = 0 then
       -- Simpler case - just drop tail
-      actors(actor.id).inbox.tail := actors(actor.id).inbox.tail + 1;
+      mailbox.tail := mailbox.tail + 1;
     else
       for i in 0 to n_msgs-1 loop
         if i /= position then
-          llist(lptr) := actors(actor.id).inbox.messages(ptr);
+          llist(lptr) := mailbox.messages(ptr);
         end if;
         lptr := lptr + 1;
-        ptr := (ptr + 1) mod 2**12;
+        ptr := (ptr + 1) mod 2**C_MAX_MSGS_L2;
       end loop;
       -- Flush list
-      actors(actor.id).inbox.tail := to_unsigned(ptr, 12);
+      mailbox.tail := to_unsigned(ptr, C_MAX_MSGS_L2);
       for i in 0 to n_msgs-2 loop
-        actors(actor.id).inbox.messages(ptr) := llist(i);
-        ptr := (ptr + 1) mod 2**12;
+        mailbox.messages(ptr) := llist(i);
+        ptr := (ptr + 1) mod 2**C_MAX_MSGS_L2;
       end loop;
-      actors(actor.id).inbox.head := to_unsigned(ptr, 12); 
+      mailbox.head := to_unsigned(ptr, C_MAX_MSGS_L2); 
+    end if;
+  end;
+
+  procedure m_delete_envelope (
+    actor      : actor_t;
+    position   : natural      := 0;
+    mailbox_id : mailbox_id_t := inbox) is
+  begin
+    if mailbox_id = inbox then
+      m_delete_envelope(position, actors(actor.id).inbox);
+    else
+      m_delete_envelope(position, actors(actor.id).outbox);
     end if;
   end;
 
@@ -1025,7 +1055,7 @@ package body com_messenger_pkg is
         position := i;
         return;
       end if;
-      ptr := (ptr + 1) mod 2**12;
+      ptr := (ptr + 1) mod 2**C_MAX_MSGS_L2;
     end loop;
 
     position := -1;
@@ -1145,7 +1175,7 @@ package body com_messenger_pkg is
                 if actors(a).subscribers_p.actors(ptr) = subscriber then
                   n_subscriptions := n_subscriptions + 1;
                 end if;
-                ptr := (ptr + 1) mod 256;
+                ptr := (ptr + 1) mod 2**C_MAX_ACTORS_L2;
               end loop;
             when outbound =>
               ptr := to_integer(actors(a).subscribers_o.tail);
@@ -1153,7 +1183,7 @@ package body com_messenger_pkg is
                 if actors(a).subscribers_o.actors(ptr) = subscriber then
                   n_subscriptions := n_subscriptions + 1;
                 end if;
-                ptr := (ptr + 1) mod 256;
+                ptr := (ptr + 1) mod 2**C_MAX_ACTORS_L2;
               end loop;
             when inbound =>
               ptr := to_integer(actors(a).subscribers_i.tail);
@@ -1161,7 +1191,7 @@ package body com_messenger_pkg is
                 if actors(a).subscribers_i.actors(ptr) = subscriber then
                   n_subscriptions := n_subscriptions + 1;
                 end if;
-                ptr := (ptr + 1) mod 256;
+                ptr := (ptr + 1) mod 2**C_MAX_ACTORS_L2;
               end loop;
           end case;
         end loop;
@@ -1187,7 +1217,7 @@ package body com_messenger_pkg is
                 subscriptions(idx).traffic_type := t;
                 idx := idx + 1;
               end if;
-              ptr := (ptr + 1) mod 256;
+              ptr := (ptr + 1) mod 2**C_MAX_ACTORS_L2;
             end loop;
           when outbound =>
             ptr := to_integer(actors(a).subscribers_o.tail);
@@ -1198,7 +1228,7 @@ package body com_messenger_pkg is
                 subscriptions(idx).traffic_type := t;
                 idx := idx + 1;
               end if;
-              ptr := (ptr + 1) mod 256;
+              ptr := (ptr + 1) mod 2**C_MAX_ACTORS_L2;
             end loop;
           when inbound =>
             ptr := to_integer(actors(a).subscribers_i.tail);
@@ -1209,7 +1239,7 @@ package body com_messenger_pkg is
                 subscriptions(idx).traffic_type := t;
                 idx := idx + 1;
               end if;
-              ptr := (ptr + 1) mod 256;
+              ptr := (ptr + 1) mod 2**C_MAX_ACTORS_L2;
             end loop;
         end case;
       end loop;
@@ -1249,7 +1279,7 @@ package body com_messenger_pkg is
             subscriptions(idx).publisher := publisher;
             subscriptions(idx).traffic_type := t;
             idx := idx + 1;
-            ptr := (ptr + 1) mod 256;
+            ptr := (ptr + 1) mod 2**C_MAX_ACTORS_L2;
           end loop;
         when outbound =>
           ptr := to_integer(actors(publisher.id).subscribers_o.tail);
@@ -1258,7 +1288,7 @@ package body com_messenger_pkg is
             subscriptions(idx).publisher := publisher;
             subscriptions(idx).traffic_type := t;
             idx := idx + 1;
-            ptr := (ptr + 1) mod 256;
+            ptr := (ptr + 1) mod 2**C_MAX_ACTORS_L2;
           end loop;
         when inbound =>
           ptr := to_integer(actors(publisher.id).subscribers_i.tail);
@@ -1267,7 +1297,7 @@ package body com_messenger_pkg is
             subscriptions(idx).publisher := publisher;
             subscriptions(idx).traffic_type := t;
             idx := idx + 1;
-            ptr := (ptr + 1) mod 256;
+            ptr := (ptr + 1) mod 2**C_MAX_ACTORS_L2;
           end loop;
       end case;
     end loop;

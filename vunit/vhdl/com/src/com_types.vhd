@@ -26,6 +26,10 @@ use work.queue_pool_pkg.all;
 
 package com_types_pkg is
 
+  -- Artificial limits to get XSIM to work.
+  constant C_MAX_MSGS_L2    : positive := 12;
+  constant C_MAX_ACTORS_L2  : positive := 8;
+
   -- These status types are mostly internal to com and will cause runtime
   -- errors. Only ok and timeout will ever be returned to the user
   type com_status_t is (ok,
