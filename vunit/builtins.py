@@ -144,7 +144,11 @@ class Builtins(object):
         if not self._vhdl_standard >= VHDL.STD_2008:
             raise RuntimeError("Communication package only supports vhdl 2008 and later")
 
-        self._add_files(VHDL_PATH / "com" / "src" / "*.vhd")
+        if simulator_is("xsim"):
+            self._add_files(VHDL_PATH / "xsim" / "com" / "src" / "*.vhd")
+
+        else:
+            self._add_files(VHDL_PATH / "com" / "src" / "*.vhd")
 
     def _add_verification_components(self):
         """

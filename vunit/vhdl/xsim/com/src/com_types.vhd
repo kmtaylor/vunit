@@ -19,12 +19,16 @@ use std.textio.all;
 use work.integer_vector_ptr_pkg.all;
 use work.integer_array_pkg.all;
 use work.string_ptr_pkg.all;
-use work.logger_pkg.all;
+--use work.logger_pkg.all;
 use work.queue_pkg.all;
 use work.queue_2008p_pkg.all;
 use work.queue_pool_pkg.all;
 
 package com_types_pkg is
+
+  -- Artificial limits to get XSIM to work.
+  constant C_MAX_MSGS_L2    : positive := 12;
+  constant C_MAX_ACTORS_L2  : positive := 8;
 
   -- These status types are mostly internal to com and will cause runtime
   -- errors. Only ok and timeout will ever be returned to the user
@@ -70,8 +74,6 @@ package com_types_pkg is
     p_name_ptrs : integer_vector_ptr_t;
   end record;
 
-  constant p_msg_types : msg_types_t := (
-    p_name_ptrs => new_integer_vector_ptr);
 
 
   -- Every message has a unique ID unless its a message from an inbound or
@@ -88,7 +90,7 @@ package com_types_pkg is
     sender : actor_t;
     receiver : actor_t;
     request_id : message_id_t;
-    payload : line;
+    payload : string(1 to 8);
   end record message_t;
   type message_ptr_t is access message_t;
 
@@ -176,7 +178,7 @@ package com_types_pkg is
     deferred_actors : actor_state_vec_ptr_t;
   end record messenger_state_t;
 
-  constant com_logger : logger_t := get_logger("vunit_lib:com");
+--  constant com_logger : logger_t := get_logger("vunit_lib:com");
   constant queue_pool : queue_pool_t := new_queue_pool;
 
   -----------------------------------------------------------------------------
@@ -185,15 +187,15 @@ package com_types_pkg is
   impure function new_msg_type(name : string) return msg_type_t;
   impure function name(msg_type : msg_type_t) return string;
 
-  procedure unexpected_msg_type(msg_type : msg_type_t;
-                                logger : logger_t := com_logger);
+  procedure unexpected_msg_type(msg_type : msg_type_t);
+--                                logger : logger_t := com_logger);
 
-  procedure push_msg_type(msg : msg_t; msg_type : msg_type_t; logger : logger_t := com_logger);
-  alias push is push_msg_type [msg_t, msg_type_t, logger_t];
+  procedure push_msg_type(msg : msg_t; msg_type : msg_type_t); -- logger : logger_t := com_logger);
+  alias push is push_msg_type [msg_t, msg_type_t];
 
-  impure function pop_msg_type(msg : msg_t;
-                               logger : logger_t := com_logger) return msg_type_t;
-  alias pop is pop_msg_type [msg_t, logger_t return msg_type_t];
+  impure function pop_msg_type(msg : msg_t) return msg_type_t;
+--                               logger : logger_t := com_logger) return msg_type_t;
+  alias pop is pop_msg_type [msg_t return msg_type_t];
 
   procedure handle_message(variable msg_type : inout msg_type_t);
   impure function is_already_handled(msg_type : msg_type_t) return boolean;
@@ -401,6 +403,8 @@ package body com_types_pkg is
   -----------------------------------------------------------------------------
   -- Handling of message types
   -----------------------------------------------------------------------------
+  constant p_msg_types : msg_types_t := (
+    p_name_ptrs => new_integer_vector_ptr);
 
   impure function new_msg_type(name : string) return msg_type_t is
     constant code : integer := length(p_msg_types.p_name_ptrs);
@@ -432,29 +436,30 @@ package body com_types_pkg is
     return msg_type = message_handled;
   end;
 
-  procedure unexpected_msg_type(msg_type : msg_type_t;
-                                logger : logger_t := com_logger) is
+  procedure unexpected_msg_type(msg_type : msg_type_t) is
+--                                logger : logger_t := com_logger) is
     constant code : integer := msg_type.p_code;
   begin
     if is_already_handled(msg_type) then
       null;
     elsif is_valid(code) then
-      failure(logger, "Got unexpected message " & to_string(to_string_ptr(get(p_msg_types.p_name_ptrs, code))));
+--      failure(logger, "Got unexpected message " & to_string(to_string_ptr(get(p_msg_types.p_name_ptrs, code))));
     else
-      failure(logger, "Got invalid message with code " & to_string(code));
+--      failure(logger, "Got invalid message with code " & to_string(code));
     end if;
   end procedure;
 
-  procedure push_msg_type(msg : msg_t; msg_type : msg_type_t; logger : logger_t := com_logger) is
+  procedure push_msg_type(msg : msg_t; msg_type : msg_type_t) is --  logger : logger_t := com_logger) is
   begin
     push(msg, msg_type.p_code);
   end;
 
-  impure function pop_msg_type(msg : msg_t; logger : logger_t := com_logger) return msg_type_t is
+--  impure function pop_msg_type(msg : msg_t; logger : logger_t := com_logger) return msg_type_t is
+  impure function pop_msg_type(msg : msg_t) return msg_type_t is
     constant code : integer := pop(msg);
   begin
     if not is_valid(code) then
-      failure(logger, "Got invalid message with code " & to_string(code));
+--      failure(logger, "Got invalid message with code " & to_string(code));
     end if;
     return (p_code => code);
   end;

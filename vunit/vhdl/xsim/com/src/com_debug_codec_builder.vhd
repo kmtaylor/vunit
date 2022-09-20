@@ -7,7 +7,9 @@
 -- Copyright (c) 2014-2022, Lars Asplund lars.anders.asplund@gmail.com
 
 library vunit_lib;
-context vunit_lib.vunit_context;
+--context vunit_lib.vunit_context;
+library vunit_lib;
+use vunit_lib.string_ops.all;
 
 use std.textio.all;
 

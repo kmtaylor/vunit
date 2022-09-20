@@ -4,7 +4,10 @@
 --
 -- Copyright (c) 2014-2022, Lars Asplund lars.anders.asplund@gmail.com
 
-context work.vunit_context;
+--context work.vunit_context;
+library vunit_lib;
+use vunit_lib.string_ops.all;
+
 use work.com_types_pkg.all;
 
 package com_support_pkg is
@@ -44,9 +47,9 @@ package body com_support_pkg is
     constant err_msg_capitalized : string := upper(err_msg_aligned) & ".";
   begin
     if msg /= "" then
-      failure(com_logger, err_msg_capitalized & " " & msg, path_offset + 1, line_num => line_num, file_name => file_name);
+--      failure(com_logger, err_msg_capitalized & " " & msg, path_offset + 1, line_num => line_num, file_name => file_name);
     else
-      failure(com_logger, err_msg_capitalized, path_offset + 1, line_num => line_num, file_name => file_name);
+--      failure(com_logger, err_msg_capitalized, path_offset + 1, line_num => line_num, file_name => file_name);
     end if;
   end;
 

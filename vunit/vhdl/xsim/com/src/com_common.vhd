@@ -13,7 +13,7 @@ use work.com_messenger_pkg.all;
 use work.com_types_pkg.all;
 
 package com_common_pkg is
-  shared variable messenger :       messenger_t;
+--  shared variable messenger :       messenger_t;
 
   procedure notify (signal net : inout network_t);
 
@@ -32,7 +32,7 @@ package body com_common_pkg is
 
   impure function no_error_status (status : com_status_t; old_api : boolean := false) return boolean is
   begin
-    return (status = ok) or ((status = timeout) and messenger.timeout_is_allowed and old_api);
+    return (status = ok) or ((status = timeout) and m_timeout_is_allowed and old_api);
   end;
 
 end package body com_common_pkg;

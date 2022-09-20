@@ -27,8 +27,8 @@ package com_pkg is
   -- created. Named actors must be unique
   impure function new_actor (
     name : string := "";
-    inbox_size : positive := positive'high;
-    outbox_size : positive := positive'high
+    inbox_size : positive := 2**C_MAX_MSGS_L2-1;
+    outbox_size : positive := 2**C_MAX_MSGS_L2-1
     ) return actor_t;
 
   -- Find named actor by name. Enable deferred creation to create a deferred
