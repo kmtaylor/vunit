@@ -43,7 +43,7 @@ end entity;
 architecture a of axi_stream_master is
 
   constant notify_request_msg      : msg_type_t := new_msg_type("notify request");
-  constant message_queue           : queue_t    := new_queue;
+  shared variable message_queue    : queue_t;
   signal   notify_bus_process_done : std_logic  := '0';
 
   procedure drive_invalid_output(signal l_tdata : out std_logic_vector(data_length(master)-1 downto 0);
@@ -91,6 +91,7 @@ begin
     variable msg_type : msg_type_t;
     variable rnd : RandomPType;
   begin
+    message_queue := new_queue;
     rnd.InitSeed(rnd'instance_name);
     loop
       if drive_invalid then
