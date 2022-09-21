@@ -11,7 +11,7 @@ use ieee.std_logic_1164.all;
 context work.com_context;
 use work.stream_slave_pkg.all;
 use work.axi_stream_pkg.all;
-use work.axi_stream_private_pkg.all;
+--use work.axi_stream_private_pkg.all;
 use work.queue_pkg.all;
 use work.sync_pkg.all;
 use work.string_ptr_pkg.all;
@@ -42,6 +42,20 @@ architecture a of axi_stream_slave is
   constant notify_request_msg      : msg_type_t := new_msg_type("notify request");
   shared variable message_queue    : queue_t;
   signal   notify_bus_process_done : std_logic  := '0';
+
+  procedure probability_stall_axi_stream(
+    signal aclk  : in std_logic;
+    stall_config : in stall_config_t;
+    rnd          : inout RandomPType) is
+    variable num_stall_cycles : natural := 0;
+  begin
+    if rnd.Uniform(0.0, 1.0) < stall_config.stall_probability then
+      num_stall_cycles := rnd.FavorSmall(stall_config.min_stall_cycles, stall_config.max_stall_cycles);
+    end if;
+    for stall in 0 to num_stall_cycles-1 loop
+       wait until rising_edge(aclk);
+    end loop;
+  end procedure;
 
 begin
 
@@ -111,7 +125,7 @@ begin
         elsif msg_type = stream_pop_msg or msg_type = pop_axi_stream_msg or msg_type = check_axi_stream_msg then
 
           -- stall according to probability configuration
-          probability_stall_axi_stream(aclk, slave, rnd);
+          probability_stall_axi_stream(aclk, slave.p_stall_config, rnd);
 
           tready <= '1';
           wait until (tvalid and tready) = '1' and rising_edge(aclk);
