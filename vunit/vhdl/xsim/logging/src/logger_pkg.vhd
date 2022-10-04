@@ -5,6 +5,7 @@
 -- Copyright (c) 2014-2022, Lars Asplund lars.anders.asplund@gmail.com
 
 use work.log_levels_pkg.all;
+use work.log_handler_pkg.all;
 use work.integer_vector_ptr_pkg.all;
 
 package logger_pkg is

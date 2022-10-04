@@ -81,7 +81,7 @@ package body checker_pkg is
     set(checker.p_data, stat_checks_idx, get(checker.p_data, stat_checks_idx) + 1);
     set(checker.p_data, stat_passed_idx, get(checker.p_data, stat_passed_idx) + 1);
 
-    log(logger, "", pass); -- invisible log
+--    log(logger, "", pass); -- invisible log
   end;
 
   procedure passing_check(
@@ -98,8 +98,8 @@ package body checker_pkg is
 
     if is_visible(logger, pass) then
       log(logger, msg, pass, path_offset + 1, line_num, file_name);
-    else
-      log(logger, "", pass); -- invisible log
+--    else
+--      log(logger, "", pass); -- invisible log
     end if;
 
   -- pragma translate_on
