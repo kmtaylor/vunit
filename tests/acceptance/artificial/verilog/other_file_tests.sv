@@ -15,7 +15,7 @@ module other_file_tests;
       end
 
       `TEST_CASE("fail") begin
-         $fatal(1, "fail");
+         $error("fail");
       end
    end;
 

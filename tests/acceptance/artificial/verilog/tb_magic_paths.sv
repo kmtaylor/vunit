@@ -12,7 +12,7 @@ module tb_magic_paths;
    parameter string output_path = "";
 
    function void check_equal(string got, string expected);
-      assert (got == expected) else $fatal(1, "Mismatch got %s expected %s", got, expected);
+      assert (got == expected) else $error("Mismatch got %s expected %s", got, expected);
    endfunction;
 
    function void check_has_suffix(string value, string suffix);

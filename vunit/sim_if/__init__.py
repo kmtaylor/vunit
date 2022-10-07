@@ -177,7 +177,7 @@ class SimulatorInterface(object):  # pylint: disable=too-many-public-methods
         """
         return False
 
-    def merge_coverage(self, file_name, args):  # pylint: disable=unused-argument, no-self-use
+    def merge_coverage(self, file_name, args):  # pylint: disable=unused-argument
         """
         Hook for simulator interface to creating coverage reports
         """
@@ -316,7 +316,10 @@ def isfile(file_name):
     Case insensitive Path.is_file()
     """
     fpath = Path(file_name)
-    if not fpath.is_file():
+    try:
+        if not fpath.is_file():
+            return False
+    except PermissionError:
         return False
 
     return str(fpath.name) in listdir(str(fpath.parent))

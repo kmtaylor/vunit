@@ -79,7 +79,7 @@ class test_runner;
       end
 
       if (index == -1) begin
-         $fatal(1, "Internal error: Cannot find 'enabled_test_cases' key");
+         $error("Internal error: Cannot find 'enabled_test_cases' key");
       end
 
       for (int i=index; i<runner_cfg.len(); i++) begin
@@ -106,7 +106,7 @@ class test_runner;
       end
 
       if (index == -1) begin
-         $fatal(1, "Internal error: Cannot find 'output path' key");
+         $error("Internal error: Cannot find 'output path' key");
       end
 
       for (int i=index; i<runner_cfg.len(); i++) begin
@@ -161,7 +161,7 @@ class test_runner;
                   return 0;
                end
                else if (!found) begin
-                  $fatal(1, "Found no \"%s\" test case", test_cases_to_run[j]);
+                  $error("Found no \"%s\" test case", test_cases_to_run[j]);
                   $stop(1);
                   return 0;
                end
@@ -218,7 +218,7 @@ class test_runner;
       fork : wait_or_timeout
          begin
             #(timeout_in_ns * 1ns);
-            $fatal(1, "Timeout waiting finish after %.3f ns", timeout_in_ns);
+            $error("Timeout waiting finish after %.3f ns", timeout_in_ns);
             disable wait_or_timeout;
          end
          begin

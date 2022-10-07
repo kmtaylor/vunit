@@ -17,7 +17,6 @@ from vunit.vhdl_standard import VHDL, VHDLStandard
 from vunit.ui.common import get_checked_file_names_from_globs
 from vunit.sim_if.common import simulator_check, simulator_is
 
-
 LOGGER = logging.getLogger(__name__)
 
 VHDL_PATH = (Path(__file__).parent / "vhdl").resolve()
@@ -99,17 +98,8 @@ class Builtins(object):
 
             for key in ["string", "integer_vector"]:
                 self._add_files(
-                    pattern=str(
-                        VHDL_PATH
-                        / "data_types"
-                        / "src"
-                        / "api"
-                        / f"external_{key!s}_pkg.vhd"
-                    )
-                    if external is None
-                    or key not in external
-                    or not external[key]
-                    or external[key] is True
+                    pattern=str(VHDL_PATH / "data_types" / "src" / "api" / f"external_{key!s}_pkg.vhd")
+                    if external is None or key not in external or not external[key] or external[key] is True
                     else external[key],
                     allow_empty=False,
                 )
@@ -179,7 +169,7 @@ class Builtins(object):
         Add osvvm library
         """
         library = self._add_library_if_not_exist(
-            "osvvm", "Library 'OSVVM' previously defined. Skipping addition of builtin OSVVM (2021.12)."
+            "osvvm", "Library 'OSVVM' previously defined. Skipping addition of builtin OSVVM (2022.04)."
         )
         if library is None:
             return

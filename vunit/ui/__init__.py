@@ -338,6 +338,30 @@ See https://github.com/VUnit/vunit/issues/777.
             raise KeyError(library_name)
         return Library(library_name, self, self._project, self._test_bench_list)
 
+    def get_libraries(
+        self,
+        pattern="*",
+        allow_empty: Optional[bool] = False,
+    ):
+        """
+        Get a list of libraries
+
+        :param pattern: A wildcard pattern matching the library name
+        :param allow_empty: To disable an error if no labraries matched the pattern
+        :returns: A :class:`.LibraryList` object
+        """
+        results = []
+
+        for library in self._project.get_libraries():
+            if not fnmatch(library.name, pattern):
+                continue
+
+            results.append(self.library(library.name))
+
+        check_not_empty(results, allow_empty, f"Pattern {pattern} did not match any library")
+
+        return LibraryList(results)
+
     def set_attribute(self, name: str, value: str, allow_empty: Optional[bool] = False):
         """
         Set a value of attribute in all |configurations|
