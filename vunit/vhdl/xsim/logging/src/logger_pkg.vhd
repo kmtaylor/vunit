@@ -36,6 +36,18 @@ package logger_pkg is
                 line_num : natural := 0;
                 file_name : string := "");
 
+  procedure debug(logger : logger_t;
+                  msg : string;
+                  path_offset : natural := 0;
+                  line_num : natural := 0;
+                  file_name : string := "");
+
+  procedure failure(logger : logger_t;
+                    msg : string;
+                    path_offset : natural := 0;
+                    line_num : natural := 0;
+                    file_name : string := "");
+
   impure function get_logger(name : string;
                              parent : logger_t := null_logger) return logger_t;
 

@@ -39,6 +39,24 @@ package body logger_pkg is
     log(default_logger, msg, log_level, path_offset + 1, line_num, file_name);
   end;
 
+  procedure debug(logger : logger_t;
+                  msg : string;
+                  path_offset : natural := 0;
+                  line_num : natural := 0;
+                  file_name : string := "") is
+  begin
+    log(logger, msg, debug, path_offset + 1, line_num, file_name);
+  end procedure;
+
+  procedure failure(logger : logger_t;
+                    msg : string;
+                    path_offset : natural := 0;
+                    line_num : natural := 0;
+                    file_name : string := "") is
+  begin
+    log(logger, msg, failure, path_offset + 1, line_num, file_name);
+  end procedure;
+
   impure function is_visible(logger : logger_t;
                              log_level : log_level_t) return boolean is
   begin

@@ -8,7 +8,7 @@ context vc_context is
   library vunit_lib;
 --  use vunit_lib.avalon_pkg.all;
 --  use vunit_lib.avalon_stream_pkg.all;
---  use vunit_lib.bus_master_pkg.all;
+  use vunit_lib.bus_master_pkg.all;
 --  use vunit_lib.axi_pkg.all;
 --  use vunit_lib.axi_slave_pkg.all;
 --  use vunit_lib.axi_statistics_pkg.all;
