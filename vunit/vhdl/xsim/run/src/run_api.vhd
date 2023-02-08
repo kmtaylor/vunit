@@ -19,6 +19,11 @@ package run_pkg is
   shared variable current_test : line;
 
   constant test_suite : boolean := true;
+
+  impure function enabled (
+    constant name : string)
+    return boolean;
+
   impure function run (
     constant name : string)
     return boolean;
@@ -38,6 +43,11 @@ package run_pkg is
     allow_disabled_errors : boolean := false;
     allow_disabled_failures : boolean := false;
     fail_on_warning : boolean := false);
+
+  procedure test_runner_watchdog (
+    signal runner                    : inout runner_sync_t;
+    constant timeout                 : in    time;
+    constant do_runner_cleanup : boolean := true);
 
   impure function output_path (
     constant runner_cfg : string)

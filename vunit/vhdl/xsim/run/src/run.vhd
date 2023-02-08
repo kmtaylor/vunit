@@ -27,10 +27,9 @@ package body run_pkg is
     return get(runner_cfg, "enabled_test_cases")'length;
   end;
 
-  impure function run (
+  impure function enabled (
     constant name : string)
     return boolean is
-    variable aux : line;
   begin
 
     if (current_test'length /= name'length) then
@@ -40,9 +39,19 @@ package body run_pkg is
       return false;
     end if;
 
-    core_pkg.test_start(name);
-
     return true;
+  end;
+
+  impure function run (
+    constant name : string)
+    return boolean is
+  begin
+    if enabled(name) then
+      core_pkg.test_start(name);
+      return true;
+    else
+      return false;
+    end if;
   end;
 
   procedure test_runner_setup (
@@ -76,6 +85,13 @@ package body run_pkg is
       core_pkg.stop(1);
     end if;
   end procedure test_runner_cleanup;
+
+  procedure test_runner_watchdog (
+    signal runner                    : inout runner_sync_t;
+    constant timeout                 : in    time;
+    constant do_runner_cleanup : boolean := true) is
+  begin
+  end procedure test_runner_watchdog;
 
   impure function output_path (
     constant runner_cfg : string)
