@@ -175,8 +175,8 @@ package body integer_vector_ptr_pkg is
     variable s : storage_t := st.idxs(ptr.ref);
   begin
     case s.mode is
-      when extfnc   => -- return read_integer(s.id, index);
-      when extacc   => -- return st.eptrs(s.id)(index);
+      when extfnc   => return -1; -- return read_integer(s.id, index);
+      when extacc   => return -1; -- return st.eptrs(s.id)(index);
       when internal => return st.ptrs(s.id)(index);
     end case;
   end;
