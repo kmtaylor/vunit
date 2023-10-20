@@ -13,6 +13,7 @@ from .activehdl import ActiveHDLInterface
 from .ghdl import GHDLInterface
 from .incisive import IncisiveInterface
 from .modelsim import ModelSimInterface
+from .nvc import NVCInterface
 from .rivierapro import RivieraProInterface
 from .xsim import XSimInterface
 from . import BooleanOption, ListOfStringOption, VHDLAssertLevelOption
@@ -34,6 +35,7 @@ class SimulatorFactory(object):
             ActiveHDLInterface,
             GHDLInterface,
             IncisiveInterface,
+            NVCInterface,
             XSimInterface,
         ]
 

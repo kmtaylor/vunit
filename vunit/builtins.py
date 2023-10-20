@@ -10,7 +10,6 @@ Functions to add builtin VHDL code to a project for compilation
 
 from pathlib import Path
 from glob import glob
-from warnings import warn
 import logging
 
 from vunit.vhdl_standard import VHDL, VHDLStandard
@@ -38,7 +37,7 @@ class Builtins(object):
         def add(name, deps=tuple()):
             self._builtins_adder.add_type(name, getattr(self, f"_add_{name!s}"), deps)
 
-        add("array_util")
+        add("array_util")  # Removed in v5.0.0
         add("com")
         add("verification_components", ["com", "osvvm"])
         add("osvvm")
@@ -104,19 +103,12 @@ class Builtins(object):
                     allow_empty=False,
                 )
 
-    def _add_array_util(self):
+    @staticmethod
+    def _add_array_util():
         """
-        Add array utility
+        Array utility was removed in v5.0.0. Raise a runtime error.
         """
-        if not self._vhdl_standard >= VHDL.STD_2008:
-            raise RuntimeError("Array util only supports vhdl 2008 and later")
-
-        arr_deprecation_note = (
-            "'array_t' is deprecated and it will removed in future releases; use 'integer_array_t' instead"
-        )
-        warn(arr_deprecation_note, Warning)
-
-        self._vunit_lib.add_source_files(VHDL_PATH / "array" / "src" / "*.vhd")
+        raise RuntimeError("Array util was removed in v5.0.0; use 'integer_array_t' instead")
 
     def _add_random(self):
         """
@@ -231,13 +223,47 @@ in your VUnit Git repository? You have to do this first if installing using setu
 
         library.add_source_files(VHDL_PATH / "JSON-for-VHDL" / "src" / "*.vhdl")
 
+    def _add_vhdl_logging(self):
+        """
+        Add logging functionality
+        """
+
+        use_call_paths = self._simulator_class.supports_vhdl_call_paths() and (
+            self._vhdl_standard in VHDL.STD_2019.and_later
+        )
+        if use_call_paths:
+            self._vunit_lib.add_source_file(VHDL_PATH / "logging" / "src" / "location_pkg-body-2019p.vhd")
+        else:
+            self._vunit_lib.add_source_file(VHDL_PATH / "logging" / "src" / "location_pkg-body-2008m.vhd")
+
+        for file_name in get_checked_file_names_from_globs(VHDL_PATH / "logging" / "src" / "*.vhd", allow_empty=False):
+            base_file_name = Path(file_name).name
+
+            if base_file_name.startswith("location_pkg-body"):
+                continue
+
+            standards = set()
+            for standard in VHDL.STANDARDS:
+                standard_name = str(standard)
+                if standard_name + "p" in base_file_name:
+                    standards.update(standard.and_later)
+                elif standard_name + "m" in base_file_name:
+                    standards.update(standard.and_earlier)
+                elif standard_name in base_file_name:
+                    standards.add(standard)
+
+            if standards and self._vhdl_standard not in standards:
+                continue
+
+            self._vunit_lib.add_source_file(file_name)
+
     def add_verilog_builtins(self):
         """
         Add Verilog builtins
         """
         self._vunit_lib.add_source_files(VERILOG_PATH / "vunit_pkg.sv")
 
-    def add_vhdl_builtins(self, external=None):
+    def add_vhdl_builtins(self, external=None, use_external_log=None):
         """
         Add vunit VHDL builtin libraries
 
@@ -266,10 +292,10 @@ in your VUnit Git repository? You have to do this first if installing using setu
                 self._add_files(VHDL_PATH / "xsim" / path / "src" / "*.vhd")
 
         else:
+            self._add_vhdl_logging()
             self._add_files(VHDL_PATH / "*.vhd")
             for path in (
                 "core",
-                "logging",
                 "string_ops",
                 "check",
                 "dictionary",
@@ -277,6 +303,14 @@ in your VUnit Git repository? You have to do this first if installing using setu
                 "path",
             ):
                 self._add_files(VHDL_PATH / path / "src" / "*.vhd")
+
+            logging_files = glob(str(VHDL_PATH / "logging" / "src" / "*.vhd"))
+            for logging_file in logging_files:
+                if logging_file.endswith("common_log_pkg-body.vhd") and use_external_log:
+                    self._add_files(Path(use_external_log))
+                    continue
+
+                self._add_files(Path(logging_file))
 
 
 def osvvm_is_installed():
@@ -309,6 +343,7 @@ class BuiltinsAdder(object):
         """
         Add builtin with arguments
         """
+
         args = {} if args is None else args
 
         if not self._add_check(name, args):
