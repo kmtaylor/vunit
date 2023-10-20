@@ -228,11 +228,6 @@ class XSimInterface(SimulatorInterface):
 
         status = True
         try:
-            resources = config.get_resources()
-            for resource in resources:
-                file_name = os.path.basename(resource)
-                copyfile(resource, output_path + "/" + file_name)
-
             if self._xelab_limit is True:
                 with self._lock:
                     proc = Process(cmd, cwd=output_path)
