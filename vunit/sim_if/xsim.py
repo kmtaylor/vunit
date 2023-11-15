@@ -274,7 +274,7 @@ class XSimInterface(SimulatorInterface):
                     else:
                         if self._vcd_enable:
                             xsim_startup_file.write(f"open_vcd {vcd_path}\n")
-                            xsim_startup_file.write("log_vcd *\n")
+                            xsim_startup_file.write("log_vcd [get_objects -recursive]\n")
                         xsim_startup_file.write("run all\n")
                         xsim_startup_file.write("quit\n")
 
