@@ -38,6 +38,7 @@ class XSimInterface(SimulatorInterface):
         StringOption("xsim.timescale"),
         BooleanOption("xsim.enable_glbl"),
         ListOfStringOption("xsim.xelab_flags"),
+        ListOfStringOption("xsim.xsim_flags"),
     ]
 
     @staticmethod
@@ -174,6 +175,16 @@ class XSimInterface(SimulatorInterface):
 
         return xelab_extra_args
 
+    @staticmethod
+    def _xsim_extra_args(config):
+        """
+        Determine xsim_extra_args
+        """
+        xsim_extra_args = []
+        xsim_extra_args = config.sim_options.get("xsim.xsim_flags", xsim_extra_args)
+
+        return xsim_extra_args
+
     def simulate(self, output_path, test_suite_name, config, elaborate_only):
         """
         Simulate with entity as top level using generics
@@ -262,6 +273,8 @@ class XSimInterface(SimulatorInterface):
                     vivado_cmd += [snapshot]
                     # Include tcl
                     vivado_cmd += ["--tclbatch", tcl_file]
+
+                vivado_cmd += self._xsim_extra_args(config)
 
                 with open(tcl_file, "w+") as xsim_startup_file:
                     if os.path.exists(vcd_path):
