@@ -2,18 +2,7 @@
 -- License, v. 2.0. If a copy of the MPL was not distributed with this file,
 -- You can obtain one at http://mozilla.org/MPL/2.0/.
 --
--- Copyright (c) 2014-2023, Lars Asplund lars.anders.asplund@gmail.com
-
-use work.string_ptr_pkg.all;
-use work.integer_vector_ptr_pkg.all;
-use work.queue_pkg.all;
-use work.core_pkg.core_failure;
-use std.textio.all;
-use work.string_ops.all;
-use work.print_pkg.print;
-use work.ansi_pkg.all;
-use work.location_pkg.all;
-use work.id_pkg.all;
+-- Copyright (c) 2014-2024, Lars Asplund lars.anders.asplund@gmail.com
 
 package body logger_pkg is
   constant global_log_count : integer_vector_ptr_t := new_integer_vector_ptr(1, value => 0);
@@ -153,17 +142,6 @@ package body logger_pkg is
   impure function get_id(logger : logger_t) return id_t is
   begin
     return to_id(get(logger.p_data, id_idx));
-  end;
-
-  impure function new_logger(name : string; parent : logger_t) return logger_t is
-    constant parent_id : id_t := get_id(parent);
-    constant id : id_t := get_id(name, parent_id);
-  begin
-    if id = null_id then
-      return null_logger;
-    end if;
-
-    return new_logger(id, parent);
   end;
 
   impure function get_real_parent(parent : logger_t) return logger_t is
@@ -889,6 +867,7 @@ package body logger_pkg is
   begin
     if logger = null_logger then
       core_failure("Attempt to log to uninitialized logger");
+      deallocate(location);
       return;
     end if;
 
@@ -913,6 +892,8 @@ package body logger_pkg is
       -- Count even if disabled
       count_log(logger, log_level);
     end if;
+
+    deallocate(location);
   end procedure;
 
   procedure debug(logger : logger_t;

@@ -4,7 +4,7 @@
 -- License, v. 2.0. If a copy of the MPL was not distributed with this file,
 -- You can obtain one at http://mozilla.org/MPL/2.0/.
 --
--- Copyright (c) 2014-2023, Lars Asplund lars.anders.asplund@gmail.com
+-- Copyright (c) 2014-2024, Lars Asplund lars.anders.asplund@gmail.com
 
 -- vunit: run_all_in_same_sim
 
@@ -65,7 +65,7 @@ begin
 
   check_runner : process
     variable passed : boolean;
-    variable check_result, check_result2 : check_result_t;
+    variable check_result : check_result_t;
     variable stat : checker_stat_t;
     constant default_level : log_level_t := error;
 

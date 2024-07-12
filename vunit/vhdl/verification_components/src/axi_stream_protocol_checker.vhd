@@ -2,7 +2,7 @@
 -- License, v. 2.0. If a copy of the MPL was not distributed with this file,
 -- You can obtain one at http://mozilla.org/MPL/2.0/.
 --
--- Copyright (c) 2014-2023, Lars Asplund lars.anders.asplund@gmail.com
+-- Copyright (c) 2014-2024, Lars Asplund lars.anders.asplund@gmail.com
 
 library ieee;
 use ieee.std_logic_1164.all;
@@ -10,9 +10,15 @@ use ieee.numeric_std_unsigned.all;
 
 use std.textio.all;
 
-context work.vunit_context;
-context work.com_context;
 use work.axi_stream_pkg.all;
+use work.check_pkg.all;
+use work.checker_pkg.all;
+use work.event_common_pkg.is_active;
+use work.integer_array_pkg.all;
+use work.log_levels_pkg.all;
+use work.logger_pkg.all;
+use work.run_pkg.all;
+use work.run_types_pkg.all;
 
 entity axi_stream_protocol_checker is
   generic (
@@ -69,6 +75,20 @@ architecture a of axi_stream_protocol_checker is
   signal areset_n_d  : std_logic := '0';
   signal areset_rose : std_logic;
   signal not_tvalid  : std_logic;
+
+  signal tdata_normalized : std_logic_vector(tdata'range);
+
+  function normalize_tdata(data, strb, keep : std_logic_vector) return std_logic_vector is
+    variable ret : std_logic_vector(data'range);
+  begin
+    ret := data;
+    for i in keep'range loop
+      if keep(i) = '0' or strb(i) = '0' then
+        ret(i*8+7 downto i*8) := (others => '0');
+      end if;
+    end loop;
+    return ret;
+  end function;
 begin
   handshake_is_not_x <= '1' when not is_x(tvalid) and not is_x(tready) else '0';
 
@@ -112,7 +132,8 @@ begin
 
   -- AXI4STREAM_ERRM_TDATA_X A value of X on TDATA is not permitted when TVALID
   -- is HIGH
-  check_not_unknown(rule5_checker, aclk, tvalid, tdata, result("for tdata when tvalid is high"));
+  tdata_normalized <= normalize_tdata(tdata, tstrb, tkeep) when protocol_checker.p_allow_x_in_non_data_bytes else tdata;
+  check_not_unknown(rule5_checker, aclk, tvalid, tdata_normalized, result("for tdata when tvalid is high"));
 
   -- AXI4STREAM_ERRM_TLAST_X A value of X on TLAST is not permitted when TVALID
   -- is HIGH

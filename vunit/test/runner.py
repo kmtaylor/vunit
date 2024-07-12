@@ -2,7 +2,7 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this file,
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 #
-# Copyright (c) 2014-2023, Lars Asplund lars.anders.asplund@gmail.com
+# Copyright (c) 2014-2024, Lars Asplund lars.anders.asplund@gmail.com
 
 """
 Provided functionality to run a suite of test in a robust way
@@ -16,6 +16,7 @@ import sys
 import time
 import logging
 import string
+from datetime import datetime
 from contextlib import contextmanager
 from .. import ostools
 from ..hashing import hash_string
@@ -149,7 +150,8 @@ class TestRunner(object):  # pylint: disable=too-many-instance-attributes
 
                 with self._stdout_lock():
                     for test_name in test_suite.test_names:
-                        print(f"Starting {test_name!s}")
+                        now = datetime.now().strftime("%H:%M:%S")
+                        print(f"({now}) Starting {test_name!s}")
                     print(f"Output file: {output_file_name!s}")
 
                 self._run_test_suite(test_suite, write_stdout, num_tests, output_path, output_file_name)

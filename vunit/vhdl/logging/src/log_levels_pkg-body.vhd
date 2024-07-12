@@ -2,11 +2,7 @@
 -- License, v. 2.0. If a copy of the MPL was not distributed with this file,
 -- You can obtain one at http://mozilla.org/MPL/2.0/.
 --
--- Copyright (c) 2014-2023, Lars Asplund lars.anders.asplund@gmail.com
-
-use work.string_ptr_pkg.all;
-use work.integer_vector_ptr_pkg.all;
-use work.core_pkg.all;
+-- Copyright (c) 2014-2024, Lars Asplund lars.anders.asplund@gmail.com
 
 package body log_levels_pkg is
 
@@ -44,7 +40,6 @@ package body log_levels_pkg is
 
   impure function create_levels return levels_t is
     variable result : levels_t;
-    variable name_ptr : string_ptr_t;
 
     procedure add_level(log_level : log_level_t; fg, bg : ansi_color_t := no_color; style : ansi_style_t := normal) is
     begin

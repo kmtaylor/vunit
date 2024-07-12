@@ -1,0 +1,1 @@
+[VHDL] Add ``check_equal`` for ``ieee.fixed_pkg`` types.

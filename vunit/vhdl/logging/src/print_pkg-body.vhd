@@ -2,9 +2,7 @@
 -- License, v. 2.0. If a copy of the MPL was not distributed with this file,
 -- You can obtain one at http://mozilla.org/MPL/2.0/.
 --
--- Copyright (c) 2014-2023, Lars Asplund lars.anders.asplund@gmail.com
-
-use work.log_handler_pkg.stdout_file_name;
+-- Copyright (c) 2014-2024, Lars Asplund lars.anders.asplund@gmail.com
 
 package body print_pkg is
 
@@ -23,7 +21,6 @@ package body print_pkg is
   procedure print(str : string;
                   file_name : string;
                   mode : file_open_kind range write_mode to append_mode := append_mode) is
-    variable l : line;
     variable status : file_open_status;
     file f : text;
   begin

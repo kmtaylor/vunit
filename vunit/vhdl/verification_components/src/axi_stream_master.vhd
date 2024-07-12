@@ -2,21 +2,22 @@
 -- License, v. 2.0. If a copy of the MPL was not distributed with this file,
 -- You can obtain one at http://mozilla.org/MPL/2.0/.
 --
--- Copyright (c) 2014-2023, Lars Asplund lars.anders.asplund@gmail.com
+-- Copyright (c) 2014-2024, Lars Asplund lars.anders.asplund@gmail.com
 
 library ieee;
 use ieee.std_logic_1164.all;
 
-context work.vunit_context;
-context work.com_context;
-use work.stream_master_pkg.all;
-use work.axi_stream_pkg.all;
-use work.axi_stream_private_pkg.all;
-use work.queue_pkg.all;
-use work.sync_pkg.all;
-
 library osvvm;
 use osvvm.RandomPkg.RandomPType;
+
+use work.axi_stream_pkg.all;
+use work.axi_stream_private_pkg.probability_stall_axi_stream;
+use work.com_pkg.net;
+use work.com_pkg.receive;
+use work.com_types_pkg.all;
+use work.queue_pkg.all;
+use work.stream_master_pkg.stream_push_msg;
+use work.sync_pkg.all;
 
 entity axi_stream_master is
   generic (

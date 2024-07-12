@@ -4,23 +4,17 @@
 -- License, v. 2.0. If a copy of the MPL was not distributed with this file,
 -- You can obtain one at http://mozilla.org/MPL/2.0/.
 --
--- Copyright (c) 2014-2023, Lars Asplund lars.anders.asplund@gmail.com
+-- Copyright (c) 2014-2024, Lars Asplund lars.anders.asplund@gmail.com
 
 library ieee;
 use ieee.std_logic_1164.all;
 
-context work.vunit_context;
-
-use work.queue_pkg.all;
-use work.queue_2008p_pkg.all;
-use work.queue_pool_pkg.all;
-use work.integer_vector_ptr_pkg.all;
-use work.string_ptr_pkg.all;
-use work.codec_pkg.all;
-use work.com_support_pkg.all;
-use work.com_messenger_pkg.all;
 use work.com_common_pkg.all;
+use work.com_messenger_pkg.all;
+use work.com_support_pkg.all;
 use work.logger_pkg.all;
+use work.queue_pkg.all;
+use work.queue_pool_pkg.all;
 
 use std.textio.all;
 
@@ -250,9 +244,6 @@ package body com_pkg is
     variable reply_msg   : inout msg_t;
     constant timeout     : in    time := max_timeout) is
     variable status       : com_status_t;
-    variable source_actor : actor_t;
-    variable mailbox      : mailbox_id_t;
-    variable message      : message_ptr_t;
   begin
     delete(reply_msg);
 

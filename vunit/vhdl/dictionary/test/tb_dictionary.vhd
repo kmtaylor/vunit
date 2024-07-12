@@ -2,7 +2,7 @@
 -- License, v. 2.0. If a copy of the MPL was not distributed with this file,
 -- You can obtain one at http://mozilla.org/MPL/2.0/.
 --
--- Copyright (c) 2014-2023, Lars Asplund lars.anders.asplund@gmail.com
+-- Copyright (c) 2014-2024, Lars Asplund lars.anders.asplund@gmail.com
 
 library vunit_lib;
 use vunit_lib.log_levels_pkg.all;
@@ -16,8 +16,7 @@ use std.textio.all;
 
 entity tb_dictionary is
   generic (
-    runner_cfg : string;
-    output_path : string);
+    runner_cfg : string);
 end entity tb_dictionary;
 
 architecture test_fixture of tb_dictionary is
@@ -25,7 +24,6 @@ begin
 
   test_runner : process
     variable value : line;
-    variable stat : checker_stat_t;
     variable passed : boolean;
     constant empty_dict : frozen_dictionary_t := empty;
     constant test_dict : frozen_dictionary_t := "output path : c::\foo\bar, input path : c::\ying\yang, active python runner : true";

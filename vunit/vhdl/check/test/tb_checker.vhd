@@ -4,7 +4,7 @@
 -- License, v. 2.0. If a copy of the MPL was not distributed with this file,
 -- You can obtain one at http://mozilla.org/MPL/2.0/.
 --
--- Copyright (c) 2014-2023, Lars Asplund lars.anders.asplund@gmail.com
+-- Copyright (c) 2014-2024, Lars Asplund lars.anders.asplund@gmail.com
 
 library vunit_lib;
 use vunit_lib.string_ops.all;
@@ -22,15 +22,13 @@ use vunit_lib.logger_pkg.all;
 
 entity tb_checker is
   generic (
-    runner_cfg : string := "";
-    output_path : string);
+    runner_cfg : string := "");
 end entity;
 
 architecture test_fixture of tb_checker is
 begin
   test_runner : process
-    variable checker1, checker2 : checker_t;
-    variable stat, stat1, stat2 : checker_stat_t;
+    variable stat1, stat2 : checker_stat_t;
     variable stat_before, stat_after : checker_stat_t;
     variable my_checker : checker_t := new_checker("my_checker");
     variable my_logger : logger_t := get_logger(my_checker);

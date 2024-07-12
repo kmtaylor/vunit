@@ -4,7 +4,7 @@
 -- License, v. 2.0. If a copy of the MPL was not distributed with this file,
 -- You can obtain one at http://mozilla.org/MPL/2.0/.
 --
--- Copyright (c) 2014-2023, Lars Asplund lars.anders.asplund@gmail.com
+-- Copyright (c) 2014-2024, Lars Asplund lars.anders.asplund@gmail.com
 
 
 package body checker_pkg is
@@ -152,6 +152,7 @@ package body checker_pkg is
       check_result.p_msg := new_string_ptr(string_pool, p_std_msg(std_fail_msg, msg, std_fail_ctx));
     end if;
 
+    deallocate(location);
     return check_result;
   end;
 

@@ -4,7 +4,7 @@
 -- License, v. 2.0. If a copy of the MPL was not distributed with this file,
 -- You can obtain one at http://mozilla.org/MPL/2.0/.
 --
--- Copyright (c) 2014-2023, Lars Asplund lars.anders.asplund@gmail.com
+-- Copyright (c) 2014-2024, Lars Asplund lars.anders.asplund@gmail.com
 
 library vunit_lib;
 use vunit_lib.string_ops.all;
@@ -194,15 +194,8 @@ begin
     variable i : natural;
     variable n_run_a, n_run_b, n_run_c : natural := 0;
     variable t_start : time;
-    constant test_checker : checker_t := new_checker("test_checker");
     variable runner_cfg : line;
     variable passed : boolean;
-    variable level : log_level_t;
-    variable my_checker : checker_t;
-    variable error_counter : natural := 0;
-    constant test_runner_logger : logger_t := get_logger("test_runner");
-    constant test_runner_setup_entry_key : key_t := get_entry_key(test_runner_setup);
-    constant test_runner_setup_exit_key : key_t := get_exit_key(test_runner_setup);
     constant test_case_setup_entry_key : key_t := get_entry_key(test_case_setup);
     constant test_case_setup_exit_key : key_t := get_exit_key(test_case_setup);
 

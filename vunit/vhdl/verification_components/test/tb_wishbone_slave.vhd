@@ -2,7 +2,7 @@
 -- License, v. 2.0. If a copy of the MPL was not distributed with this file,
 -- You can obtain one at http://mozilla.org/MPL/2.0/.
 --
--- Copyright (c) 2014-2023, Lars Asplund lars.anders.asplund@gmail.com
+-- Copyright (c) 2014-2024, Lars Asplund lars.anders.asplund@gmail.com
 -- Author Slawomir Siluk slaweksiluk@gazeta.pl
 
 library ieee;
@@ -69,8 +69,6 @@ architecture a of tb_wishbone_slave is
 begin
 
   main_stim : process
-    variable tmp : std_logic_vector(dat_i'range);
-    variable value : std_logic_vector(dat_i'range) := (others => '1');
   begin
     test_runner_setup(runner, runner_cfg);
     set_format(display_handler, verbose, true);

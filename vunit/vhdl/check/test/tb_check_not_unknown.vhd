@@ -4,7 +4,7 @@
 -- License, v. 2.0. If a copy of the MPL was not distributed with this file,
 -- You can obtain one at http://mozilla.org/MPL/2.0/.
 --
--- Copyright (c) 2014-2023, Lars Asplund lars.anders.asplund@gmail.com
+-- Copyright (c) 2014-2024, Lars Asplund lars.anders.asplund@gmail.com
 
 -- vunit: run_all_in_same_sim
 
@@ -43,10 +43,8 @@ architecture test_fixture of tb_check_not_unknown is
   alias en_5 : std_logic is check_not_unknown_in_5(0);
   alias en_6 : std_logic is check_not_unknown_in_6(0);
 
-  constant my_checker : checker_t := new_checker("my_checker1");
   constant my_checker2 : checker_t := new_checker("my_checker2");
   constant my_checker3 : checker_t := new_checker("my_checker3", default_log_level => info);
-  constant my_checker4 : checker_t := new_checker("my_checker4");
   constant my_checker5 : checker_t := new_checker("my_checker5");
   constant my_checker6 : checker_t := new_checker("my_checker6", default_log_level => info);
 

@@ -4,7 +4,7 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this file,
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 #
-# Copyright (c) 2014-2023, Lars Asplund lars.anders.asplund@gmail.com
+# Copyright (c) 2014-2024, Lars Asplund lars.anders.asplund@gmail.com
 
 """
 Functionality to represent and operate on a HDL code project
@@ -209,11 +209,11 @@ Solution - Add a call to 'add_vhdl_builtins()' after the following location:
 
 As shown below:
 
-{num-1}|  {content[num-2].rstrip()}
+{num - 1}|  {content[num - 2].rstrip()}
 {num}|  {line.rstrip()}
-{num+1}|+ {line.split('=')[0].rstrip()}.add_vhdl_builtins()  # Add this line!
-{num+2}|  {content[num].rstrip()}
-{num+3}|  {content[num+1].rstrip()}
+{num + 1}|+ {line.split('=')[0].rstrip()}.add_vhdl_builtins()  # Add this line!
+{num + 2}|  {content[num].rstrip()}
+{num + 3}|  {content[num + 1].rstrip()}
 """
                 hline = "=" * 75
                 print(hline)

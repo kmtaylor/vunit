@@ -2,9 +2,13 @@
 -- License, v. 2.0. If a copy of the MPL was not distributed with this file,
 -- You can obtain one at http://mozilla.org/MPL/2.0/.
 --
--- Copyright (c) 2014-2023, Lars Asplund lars.anders.asplund@gmail.com
+-- Copyright (c) 2014-2024, Lars Asplund lars.anders.asplund@gmail.com
 
 use std.textio.all;
+
+use work.ansi_pkg.all;
+use work.log_levels_pkg.all;
+use work.string_ops.upper;
 
 package common_log_pkg is
   -- Deferred constant set to true in the native implementation of the package.

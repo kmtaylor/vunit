@@ -2,24 +2,23 @@
 -- License, v. 2.0. If a copy of the MPL was not distributed with this file,
 -- You can obtain one at http://mozilla.org/MPL/2.0/.
 --
--- Copyright (c) 2014-2023, Lars Asplund lars.anders.asplund@gmail.com
+-- Copyright (c) 2014-2024, Lars Asplund lars.anders.asplund@gmail.com
 -- Author Slawomir Siluk slaweksiluk@gazeta.pl
 -- Wishbome Master BFM for pipelined block transfers
 
 library ieee;
 use ieee.std_logic_1164.all;
 
-use work.queue_pkg.all;
+library osvvm;
+use osvvm.RandomPkg.RandomPType;
+
 use work.bus_master_pkg.all;
-context work.com_context;
+use work.com_pkg.all;
+use work.queue_pkg.all;
 use work.com_types_pkg.all;
-use work.logger_pkg.all;
 use work.check_pkg.all;
 use work.log_levels_pkg.all;
 use work.sync_pkg.all;
-
-library osvvm;
-use osvvm.RandomPkg.all;
 
 entity wishbone_master is
   generic (
@@ -41,10 +40,7 @@ entity wishbone_master is
 end entity;
 
 architecture a of wishbone_master is
-  constant rd_request_queue : queue_t := new_queue;
-  constant wr_request_queue : queue_t := new_queue;
   constant acknowledge_queue : queue_t := new_queue;
-  constant bus_ack_msg   : msg_type_t := new_msg_type("wb master ack msg");
   constant wb_master_ack_actor : actor_t := new_actor;
   signal start_cycle : std_logic := '0';
   signal end_cycle : std_logic := '0';
@@ -109,10 +105,7 @@ begin
   end process;
 
   p_cycle : process
-    variable request_msg : msg_t;
-    variable ack_msg : msg_t;
     variable pending : natural := 0;
-    variable received_acks : natural := 0;
   begin
     cyc <= '0';
     cycle <= false;
@@ -139,7 +132,7 @@ begin
   end process;
 
   acknowledge : process
-    variable request_msg, reply_msg, ack_msg : msg_t;
+    variable request_msg, reply_msg : msg_t;
   begin
     wait until ack = '1' and rising_edge(clk);
     request_msg := pop(acknowledge_queue);

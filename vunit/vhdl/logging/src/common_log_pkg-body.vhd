@@ -2,11 +2,7 @@
 -- License, v. 2.0. If a copy of the MPL was not distributed with this file,
 -- You can obtain one at http://mozilla.org/MPL/2.0/.
 --
--- Copyright (c) 2014-2023, Lars Asplund lars.anders.asplund@gmail.com
-
-use work.ansi_pkg.all;
-use work.log_levels_pkg.all;
-use work.string_ops.upper;
+-- Copyright (c) 2014-2024, Lars Asplund lars.anders.asplund@gmail.com
 
 package body common_log_pkg is
   constant is_original_pkg : boolean := true;

@@ -2,7 +2,7 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this file,
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 #
-# Copyright (c) 2014-2023, Lars Asplund lars.anders.asplund@gmail.com
+# Copyright (c) 2014-2024, Lars Asplund lars.anders.asplund@gmail.com
 
 """
 Interface for NVC simulator
@@ -57,6 +57,7 @@ class NVCInterface(SimulatorInterface):  # pylint: disable=too-many-instance-att
             output_path=output_path,
             prefix=prefix,
             gui=args.gui,
+            num_threads=args.num_threads,
         )
 
     @classmethod
@@ -70,6 +71,7 @@ class NVCInterface(SimulatorInterface):  # pylint: disable=too-many-instance-att
         self,
         output_path,
         prefix,
+        num_threads,
         gui=False,
         gtkwave_args="",
     ):
@@ -90,6 +92,10 @@ class NVCInterface(SimulatorInterface):  # pylint: disable=too-many-instance-att
 
         if self.use_color:
             environ["NVC_COLORS"] = "always"
+
+        # Allow NVC to scale its worker thread count based on the number
+        # of VUnit threads and the number of available CPUs.
+        environ["NVC_CONCURRENT_JOBS"] = str(num_threads)
 
     def has_valid_exit_code(self):  # pylint: disable=arguments-differ
         """
