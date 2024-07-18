@@ -74,6 +74,13 @@ class XSimInterface(SimulatorInterface):
         )
 
     @classmethod
+    def supports_vhdl_package_generics(cls):
+        """
+        Returns True when this simulator supports VHDL package generics
+        """
+        return True
+
+    @classmethod
     def find_prefix_from_path(cls):
         """
         Find first valid xsim toolchain prefix
