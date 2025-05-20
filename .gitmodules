@@ -1,6 +1,6 @@
 [submodule "vunit/vhdl/osvvm"]
 	path = vunit/vhdl/osvvm
-	url = ../../OSVVM/OSVVM.git
+	url = ../../kmtaylor/OSVVM.git
 [submodule "vunit/vhdl/JSON-for-VHDL"]
 	path = vunit/vhdl/JSON-for-VHDL
 	url = ../../kmtaylor/JSON-for-VHDL.git
