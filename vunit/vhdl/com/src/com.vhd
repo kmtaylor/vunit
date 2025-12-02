@@ -4,7 +4,7 @@
 -- License, v. 2.0. If a copy of the MPL was not distributed with this file,
 -- You can obtain one at http://mozilla.org/MPL/2.0/.
 --
--- Copyright (c) 2014-2024, Lars Asplund lars.anders.asplund@gmail.com
+-- Copyright (c) 2014-2025, Lars Asplund lars.anders.asplund@gmail.com
 
 library ieee;
 use ieee.std_logic_1164.all;
@@ -446,6 +446,11 @@ package body com_pkg is
     position     := messenger.find_reply_message(source_actor, request_msg.id, mailbox_id);
 
     check(position /= -1, null_message_error);
+
+    -- For testing purposes when logger is mocked and the check procedure returns
+    if position = -1 then
+      return;
+    end if;
 
     get_message(net, source_actor, position, mailbox_id, reply_msg);
   end;
