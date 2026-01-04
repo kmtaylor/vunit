@@ -9,7 +9,7 @@
 
 library ieee;
 use ieee.std_logic_1164.all;
-use ieee.numeric_std.all;
+use ieee.numeric_bit.all;
 
 use work.com_types_pkg.all;
 use work.com_support_pkg.all;
@@ -349,32 +349,25 @@ package body com_messenger_pkg is
     return false;
   end;
 
-
   procedure m_remove_subscriber (subscribers : inout subscriber_item_t; subscriber : actor_t; found : inout boolean) is
-    variable llist  : actor_vec_t(0 to 2**C_MAX_ACTORS_L2-1);
-    variable lptr   : natural := 0;
     variable n_subs : natural := m_count_subscribers(subscribers);
     variable ptr    : natural := to_integer(subscribers.tail);
+    variable ptr_m1 : natural;
   begin
     for i in 0 to n_subs-1 loop
-      if subscribers.actors(ptr) /= subscriber then
-        llist(lptr) := subscribers.actors(ptr);
-        lptr := lptr + 1;
-      else
-        found := true;
-      end if;
+      found := subscribers.actors(ptr) = subscriber;
+      exit when found;
       ptr := (ptr + 1) mod 2**C_MAX_ACTORS_L2;
     end loop;
     if not found then
       return;
     end if;
-    -- Flush list
-    subscribers.tail := to_unsigned(ptr, C_MAX_ACTORS_L2);
-    for i in 0 to n_subs-2 loop
-      subscribers.actors(ptr) := llist(i);
-      ptr := (ptr + 1) mod 2**C_MAX_ACTORS_L2;
+    while ptr /= subscribers.tail loop  
+      ptr_m1 := (ptr + 2**C_MAX_MSGS_L2-1) mod 2**C_MAX_MSGS_L2;
+      subscribers.actors(ptr) := subscribers.actors(ptr_m1);
+      ptr := ptr_m1;
     end loop;
-    subscribers.head := to_unsigned(ptr, C_MAX_ACTORS_L2); 
+    subscribers.tail := subscribers.tail + 1;
   end;
 
   procedure m_remove_subscriber (subscriber : actor_t; publisher : actor_t; traffic_type : subscription_traffic_type_t) is
@@ -937,34 +930,19 @@ package body com_messenger_pkg is
   procedure m_delete_envelope (
     position   : natural      := 0;
     mailbox    : inout mailbox_t) is
-    variable llist  : message_array_t(0 to 2**C_MAX_MSGS_L2-1);
-    variable lptr   : natural := 0;
     variable n_msgs : natural := m_count_messages(mailbox);
-    variable ptr    : natural := to_integer(mailbox.tail);
+    variable ptr    : natural := to_integer(mailbox.tail + position);
+    variable ptr_m1 : natural;
   begin
     if n_msgs <= position then
       return;
     end if;
-
-    if position = 0 then
-      -- Simpler case - just drop tail
-      mailbox.tail := mailbox.tail + 1;
-    else
-      for i in 0 to n_msgs-1 loop
-        if i /= position then
-          llist(lptr) := mailbox.messages(ptr);
-        end if;
-        lptr := lptr + 1;
-        ptr := (ptr + 1) mod 2**C_MAX_MSGS_L2;
-      end loop;
-      -- Flush list
-      mailbox.tail := to_unsigned(ptr, C_MAX_MSGS_L2);
-      for i in 0 to n_msgs-2 loop
-        mailbox.messages(ptr) := llist(i);
-        ptr := (ptr + 1) mod 2**C_MAX_MSGS_L2;
-      end loop;
-      mailbox.head := to_unsigned(ptr, C_MAX_MSGS_L2); 
-    end if;
+    for i in 0 to position-1 loop
+      ptr_m1 := (ptr + 2**C_MAX_MSGS_L2-1) mod 2**C_MAX_MSGS_L2;
+      mailbox.messages(ptr) := mailbox.messages(ptr_m1);
+      ptr := ptr_m1;
+    end loop;
+    mailbox.tail := mailbox.tail + 1;
   end;
 
   procedure m_delete_envelope (
@@ -1255,7 +1233,7 @@ package body com_messenger_pkg is
       for t in subscription_traffic_type_t'left to subscription_traffic_type_t'right loop
         case t is
           when published =>
-            n_subscriptions := n_subscriptions + m_count_subscribers(actors(publisher.id).subscribers_o);
+            n_subscriptions := n_subscriptions + m_count_subscribers(actors(publisher.id).subscribers_p);
           when outbound =>
             n_subscriptions := n_subscriptions + m_count_subscribers(actors(publisher.id).subscribers_o);
           when inbound =>
@@ -1266,7 +1244,7 @@ package body com_messenger_pkg is
       return n_subscriptions;
     end;
     constant n_subscriptions : natural := m_num_of_subscriptions;
-    variable subscriptions : subscription_vec_t(0 to 0);
+    variable subscriptions : subscription_vec_t(0 to n_subscriptions-1);
     variable idx : natural := 0;
     variable ptr : natural;
   begin
