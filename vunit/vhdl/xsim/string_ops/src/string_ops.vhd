@@ -4,7 +4,7 @@
 -- License, v. 2.0. If a copy of the MPL was not distributed with this file,
 -- You can obtain one at http://mozilla.org/MPL/2.0/.
 --
--- Copyright (c) 2014-2022, Lars Asplund lars.anders.asplund@gmail.com
+-- Copyright (c) 2014-2025, Lars Asplund lars.anders.asplund@gmail.com
 
 library ieee;
 use ieee.std_logic_1164.all;
@@ -57,6 +57,9 @@ package string_ops is
   function hex_image (
     constant data : std_logic_vector)
     return string;
+  function from_hex (
+    constant s : string)
+    return std_logic_vector;
   function replace (
     constant s      : string;
     constant old_segment : character;
@@ -113,6 +116,38 @@ package string_ops is
   function to_nibble_string (
     constant value : signed)
     return string;
+
+  -- Initial tag in subprogram string input parameters. If supported, the tag is
+  -- used to indicate that the subprogram shall take the remainder of the string
+  -- and decorate it with information internal to the subprogram. The resulting
+  -- string as the actual parameter to be used. The decoration to be performed
+  -- is specific to the subprogram being called.
+  constant decorate_tag : string := "<+/->";
+
+  -- Used by caller of a subprogram supporting string decoration. The function
+  -- returns:
+  -- 1. decorate_tag if input is the empty string. The called subprogram is in
+  --    full control of the string used. For example, the decorate_tag may
+  --    be translated to "BFM has performed 5 transactions"
+  -- 2. decorate_tag & str if str starts with one of the punctuation marks '.', ',',
+  --    ':', ';', '?', or '!'. For example, if the provided string is
+  --    ". Completed init sequence." the subprogram may translate the decorated string
+  --    to "BFM has performed 5 transactions. Completed init sequence."
+  -- 3. decorate_tag & " " & str if str doesn't start with one of the punctuation marks.
+  --    If str = "after completing init sequence." the subprogram may translate
+  --    the decorated string to "BFM has performed 5 transactions after completing init
+  --    sequence."
+  --
+  -- Note: The function is very specific to VUnit and is not recommended for external use.
+  function decorate(
+  str : string := "") return string;
+
+  -- Return true if str is decorated with decorate_tag, false otherwise.
+  function is_decorated(str : string) return boolean;
+
+  -- Remove decorate_tag from str if str is decorated
+  function undecorate(str : string := "") return string;
+
 end package;
 
 package body string_ops is
@@ -228,6 +263,40 @@ package body string_ops is
     end loop;
     ret_val(1 to 2) := "x""";
     ret_val(ret_val'right) := '"';
+    return ret_val;
+  end;
+
+  function from_hex (
+    constant s : string)
+    return std_logic_vector is
+    variable ret_val : std_logic_vector(4 * s'length - 1 downto 0);
+    variable ret_val_idx : natural := 0;
+    variable nibble_value : natural;
+    variable pos : natural;
+
+    function within(c, low, high : character) return boolean is
+    begin
+      return (character'pos(c) >= character'pos(low)) and (character'pos(c) <= character'pos(high));
+    end;
+  begin
+    assert s'length > 0 report "from_hex input parameter length must be greater than 0" severity failure;
+
+    for idx in s'reverse_range loop
+      pos := character'pos(s(idx));
+      if within(s(idx), '0', '9') then
+        nibble_value := pos - character'pos('0');
+      elsif within(s(idx), 'a', 'f') then
+        nibble_value := pos - character'pos('a') + 10;
+      elsif within(s(idx), 'A', 'F') then
+        nibble_value := pos - character'pos('A') + 10;
+      else
+        report "Illegal hex digit: " & s(idx) severity failure;
+      end if;
+
+      ret_val(ret_val_idx + 3 downto ret_val_idx) := std_logic_vector(to_unsigned(nibble_value, 4));
+      ret_val_idx := ret_val_idx + 4;
+    end loop;
+
     return ret_val;
   end;
 
@@ -453,7 +522,7 @@ package body string_ops is
     variable start_pos, stop_pos : natural;
     variable n, o : natural := 0;
   begin
-    if substring = "" then
+    if substring'length = 0 then
       n := s'length + 1;
     elsif s = "" then
       n := 0;
@@ -530,7 +599,7 @@ package body string_ops is
       stop_pos := stop;
     end if;
 
-    if substring = "" then
+    if substring'length = 0 then
       return start_pos;
     end if;
 
@@ -562,16 +631,11 @@ package body string_ops is
     variable i, n_splits : natural := 0;
     constant s_int : string(1 to s'length) := s;
   begin
-    -- fixme
-    -- if (count(s_int, sep) <= max_split) or (max_split = -1) then
-    --   ret_val := new line_vector(0 to count(s_int, sep));
-    -- else
-    --   ret_val := new line_vector(0 to max_split);
-    -- end if;
-    if ( count(s_int, sep) > 2500 ) then
-      assert false Report "String length > 500" severity failure;
+    if (count(s_int, sep) <= max_split) or (max_split = -1) then
+      ret_val := new line_vector(0 to count(s_int, sep));
+    else
+      ret_val := new line_vector(0 to max_split);
     end if;
-    ret_val := new line_vector(0 to 2500);
 
     i := 1;
     while i <= s_int'length - sep'length + 1 loop
@@ -709,5 +773,34 @@ package body string_ops is
   begin
     return to_nibble_string(unsigned(value));
   end function to_nibble_string;
+
+  function decorate(str : string := "") return string is
+  begin
+    if str = "" then
+      return decorate_tag;
+    elsif str(str'left) = '.' or str(str'left) = ',' or str(str'left) = ':' or str(str'left) = ';' or str(str'left) = '?' or str(str'left) = '!' then
+      return decorate_tag & str;
+    else
+      return decorate_tag & " " & str;
+    end if;
+  end;
+
+  function is_decorated(str : string) return boolean is
+  begin
+    if str'length < decorate_tag'length then
+      return false;
+    else
+      return str(str'left to str'left + decorate_tag'length - 1) = decorate_tag;
+    end if;
+  end;
+
+  function undecorate(str : string := "") return string is
+  begin
+    if is_decorated(str) then
+      return str(str'left + decorate_tag'length to str'right);
+    else
+      return str;
+    end if;
+  end;
 
 end package body;

@@ -76,14 +76,9 @@ package body dictionary is
           return;
         end if;
       else
-        if strip(replace(replace(key_value_pair(0).all, "__escaped_comma__", ','), "__escaped_colon__", ':')) = strip(key) then
-          status := valid_value;
-          write(value, strip(replace(replace(key_value_pair(1).all, "__escaped_comma__", ','), "__escaped_colon__", ':')));
-          return;
-        end if;
-        -- report("Corrupt frozen dictionary item """ & key_value_pairs(i).all & """ in """ & d & """.");
-        -- write(value, string'("will return when log is mocked out during unit test."));
-        -- return;
+        report("Corrupt frozen dictionary item """ & key_value_pairs(i).all & """ in """ & d & """.");
+        write(value, string'("will return when log is mocked out during unit test."));
+        return;
       end if;
 
     end loop;
