@@ -2,7 +2,7 @@
 -- License, v. 2.0. If a copy of the MPL was not distributed with this file,
 -- You can obtain one at http://mozilla.org/MPL/2.0/.
 --
--- Copyright (c) 2014-2022, Lars Asplund lars.anders.asplund@gmail.com
+-- Copyright (c) 2014-2025, Lars Asplund lars.anders.asplund@gmail.com
 
 package types_pkg is
   subtype index_t is integer range -1 to integer'high;
@@ -30,8 +30,7 @@ package types_pkg is
   type integer_vector_access_vector_t is array (natural range <>) of integer_vector_access_t;
   type integer_vector_access_vector_access_t is access integer_vector_access_vector_t;
 
-  type extintvec_access_t is access integer_vector_t(0 to integer'high);
+  type extintvec_access_t is access integer_vector_t(0 to integer'high / 2 - 1);
   type extintvec_access_vector_t is array (natural range <>) of extintvec_access_t;
   type extintvec_access_vector_access_t is access extintvec_access_vector_t;
 end package;
-

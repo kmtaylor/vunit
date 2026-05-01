@@ -2,8 +2,12 @@
 -- License, v. 2.0. If a copy of the MPL was not distributed with this file,
 -- You can obtain one at http://mozilla.org/MPL/2.0/.
 --
--- Copyright (c) 2014-2022, Lars Asplund lars.anders.asplund@gmail.com
+-- Copyright (c) 2014-2025, Lars Asplund lars.anders.asplund@gmail.com
 
+use std.textio.all;
+
+use work.codec_builder_pkg.all;
+use work.codec_pkg.all;
 use work.integer_vector_ptr_pkg.all;
 
 package integer_array_pkg is
@@ -177,5 +181,19 @@ package integer_array_pkg is
   procedure save_raw (
     arr       : integer_array_t;
     file_name : string
+  );
+
+  function encode (
+    data : integer_array_t
+  ) return string;
+
+  function decode (
+    code : string
+  ) return integer_array_t;
+
+  procedure decode (
+    constant code   : string;
+    variable index  : inout positive;
+    variable result : out integer_array_t
   );
 end package;
